@@ -31,10 +31,8 @@
 #Library dependencies:
 #caret is a common R machine learning package. Specifically, I call it here to avoid implementing my own cross validation function. 
 #Specifically, I want to harness the stratefied cross validation as we would like to have the same amount of censoring in each fold.
+#Additionally, we use the one hot encoding function built into caret (dummyVars).
 library(caret)
-#onehot is a library which will be used for the one-hot encoding of factor variables.
-library(onehot)
-
 
 createFoldsAndNormalize = function(survivalDataset, numberOfFolds){
   listOfDatasets = createFoldsOfData(survivalDataset, numberOfFolds)
@@ -62,9 +60,8 @@ meanImputation = function(listOfDatasets, numberOfFolds){
     #nothing.
     
     #For numeric variables:
-    
-    #The argument drop = FALSE makes it stay as a dataframe instead of turning to a vector in the event there is only 1 numeric variable.
     trainNumeric = train[,sapply(train,is.numeric), drop = FALSE]
+    #drop = FALSE makes it stay as a dataframe instead of turning to a vector in the event there is only 1 variable with the condition.
     testNumeric = test[,sapply(test,is.numeric), drop = FALSE]
     varMeans = apply(trainNumeric,2,function(x) mean(x, na.rm = T))
     trainNumericImputed = apply(trainNumeric, 2, function(x) ifelse(is.na(x),mean(x, na.rm = T),x))
@@ -111,13 +108,12 @@ normalizeVariables = function(listOfImputedDatasets, numberOfFolds){
   for(i in 1:numberOfFolds){
     train = listOfImputedDatasets$Training[[i]]
     test = listOfImputedDatasets$Testing[[i]]
-    #We shouldn't need na.rm = T anymore so we will remove it.
+    #We need to remove time an delta so they don't get normalized. Here we set them apart and make an indicator for their location.
     timeDeltaInd = which(names(train) %in% c("time","delta"))
     timeDeltaTrain = train[,timeDeltaInd]
     timeDeltaTest = test[,timeDeltaInd]
     
-    
-    #For numeric variables:
+    #For numeric variables (need to normalize):
     trainNumeric = train[,-timeDeltaInd][,sapply(train[,-timeDeltaInd],is.numeric), drop=FALSE]
     testNumeric = test[,-timeDeltaInd][,sapply(test[,-timeDeltaInd],is.numeric), drop = FALSE]
     varMeans = apply(trainNumeric,2,mean)
@@ -128,11 +124,11 @@ normalizeVariables = function(listOfImputedDatasets, numberOfFolds){
     testNumericNormalized = as.data.frame(sapply(1:length(varMeans), function(x) (testNumeric[x] - varMeans[x])/varSD[x]))
     names(testNumericNormalized) = names(testNumeric)
     
-    #For the factor variables:
+    #For the factor variables (need to don one hot encoding):
     trainFactor = train[,-timeDeltaInd][,sapply(train[,-timeDeltaInd],is.factor), drop=FALSE]
     testFactor = test[,-timeDeltaInd][,sapply(test[,-timeDeltaInd],is.factor), drop = FALSE]
     
-    #fullRank =T drops one of the extra columns.
+    #fullRank =T drops one of the extra columns for the one-hot encoding.
     oneHotEncoder = dummyVars("~.",data = trainFactor, fullRank = T)
     trainFactorEncoded = predict(oneHotEncoder, trainFactor)
     testFactorEncoded = predict(oneHotEncoder, testFactor)
