@@ -13,6 +13,10 @@
 #Input: Survival Dataset
 #Output: Survival Dataset which has been validated and had minor cleaning.
 ############################################################################################################################################
+#No library calls needed.
+
+#Functions:
+
 validateAndClean = function(survivalDataset){
   validatedData = validate(survivalDataset)
   cleanData = clean(validatedData)

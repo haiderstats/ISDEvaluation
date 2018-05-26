@@ -34,6 +34,7 @@
 #Additionally, we use the one hot encoding function built into caret (dummyVars).
 library(caret)
 
+#Functions:
 createFoldsAndNormalize = function(survivalDataset, numberOfFolds){
   listOfDatasets = createFoldsOfData(survivalDataset, numberOfFolds)
   listOfImputedDatasets = meanImputation(listOfDatasets, numberOfFolds)
