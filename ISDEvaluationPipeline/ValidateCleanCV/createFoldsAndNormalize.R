@@ -1,5 +1,5 @@
 #File Name: createFoldsAndNormalize.R
-#Date: May 25, 2018
+#Date Created: May 25, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
 
