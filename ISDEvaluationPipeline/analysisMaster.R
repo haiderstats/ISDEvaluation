@@ -55,14 +55,16 @@ analysisMaster = function(survivalDataset, numberOfFolds,
   for(i in 1:numberOfFolds){
     #Models - We evaluate values to NULL so we can pass them to evaluations, regardless if the models were ran or not.
     coxMod = NULL; kmMod = NULL; rsfMod = NULL; aftMod = NULL;
+    training = normalizedData[[1]][[i]]
+    testing = normalizedData[[2]][[i]]
     if(CoxKP)
-      coxMod = CoxPH_KP(normalizedData[[1]][[i]], normalizedData[[2]][[i]])
+      coxMod = CoxPH_KP(training, testing)
     if(KaplanMeier)
-      kmMod = KaplanMeier(normalizedData[[1]][[i]], normalizedData[[2]][[i]])
+      kmMod = KaplanMeier(training, testing)
     if(RSF)
-      rsfMod = RSF(normalizedData[[1]][[i]], normalizedData[[2]][[i]])
+      rsfMod = RSF(training, testing)
     if(AFT)
-      aftMod = AFT(normalizedData[[1]][[i]], normalizedData[[2]][[i]])
+      aftMod = AFT(training, testing)
     #Evaluations - Note that if evaluations are passed a NULL value they return a NULL.
     DCalResults = NULL;OneCalResults = NULL;ConcResults = NULL;BrierResults = NULL;L1Results = NULL; L2Results = NULL; 
     if(DCal){
