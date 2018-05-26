@@ -28,8 +28,121 @@
 #                                  |.--> Testing Dataset #(K-1)
 #                                  |.--> Testing Dataset #K
 ############################################################################################################################################
+#Library dependencies:
+#caret is a common R machine learning package. Specifically, I call it here to avoid implementing my own cross validation function. 
+#Specifically, I want to harness the stratefied cross validation as we would like to have the same amount of censoring in each fold.
+library(caret)
+#onehot is a library which will be used for the one-hot encoding of factor variables.
+library(onehot)
 
 
+createFoldsAndNormalize = function(survivalDataset, numberOfFolds){
+  listOfDatasets = createFoldsOfData(survivalDataset, numberOfFolds)
+  listOfImputedDatasets = meanImputation(listOfDatasets, numberOfFolds)
+  listOfNormalizedDatasets = normalizeVariables(listOfImputedDatasets, numberOfFolds)
+  return(listOfNormalizedDatasets)
+}
+
+createFoldsOfData = function(survivalDataset, numberOfFolds){
+  #Create folds with the equal amounts of censoring.
+  foldIndex = createFolds(as.factor(survivalDataset$delta), k = numberOfFolds, list = TRUE)
+  listOfTestingSets = lapply(foldIndex, function(indexs) survivalDataset[indexs,])
+  listOfTrainingSets = lapply(foldIndex, function(indexs) survivalDataset[-indexs,])
+  listOfDatasets = list(Training = listOfTrainingSets, Testing = listOfTestingSets)
+  return(listOfDatasets)
+}
+
+meanImputation = function(listOfDatasets, numberOfFolds){
+  #Here we take the means (numeric variables) and modes (factor variables) of the training and data and impute the training AND the 
+  #testing data with the same mean/mode of the respective training data.
+  for(i in 1:numberOfFolds){
+    train = listOfDatasets$Training[[i]]
+    test = listOfDatasets$Testing[[i]]
+    #Note that we are also imputing time and delta, but validation removed all NA instances of time and delta so we are really imputing 
+    #nothing.
+    
+    #For numeric variables:
+    
+    #The argument drop = FALSE makes it stay as a dataframe instead of turning to a vector in the event there is only 1 numeric variable.
+    trainNumeric = train[,sapply(train,is.numeric), drop = FALSE]
+    testNumeric = test[,sapply(test,is.numeric), drop = FALSE]
+    varMeans = apply(trainNumeric,2,function(x) mean(x, na.rm = T))
+    trainNumericImputed = apply(trainNumeric, 2, function(x) ifelse(is.na(x),mean(x, na.rm = T),x))
+    #The function is more complex for test because we have to specify the means and sd of the TRAINING set as we go through 
+    #the columns of the test set.
+    testNumericImputed = as.data.frame(sapply(1:length(varMeans), function(x) ifelse(is.na(testNumeric[,x]),varMeans[x],testNumeric[,x])))
+    #Names are getting lost in sapply
+    names(testNumericImputed) = names(testNumeric)
+    
+    
+    #For factor variables:
+    trainFactor = train[,sapply(train,is.factor),drop=FALSE]
+    testFactor = test[,sapply(test,is.factor),drop=FALSE]    
+    #We need to introduce a mode function to find the mode of the factor variables.
+    Mode <- function(x) {
+      #Modified from https://stackoverflow.com/questions/2547402/is-there-a-built-in-function-for-finding-the-mode
+       x = x[!is.na(x)]
+       ux <- unique(x)
+       ux[which.max(tabulate(match(x, ux)))]
+    }
+    varModes = apply(trainFactor,2,function(x) Mode(x))
+    trainFactorListed = lapply(trainFactor, as.character)
+    trainFactorImputed = as.data.frame(lapply(trainFactorListed, function(x) ifelse(is.na(x), Mode(x), x)))
+    #We run into problems if the training dataset didn't have a factor level in it which was included in the 
+    #original dataset. Here we are just adding back the original factor levels.
+    for(j in 1:ncol(trainFactorImputed)){
+      missedLevels = levels(trainFactor[,j])[which(!levels(trainFactor[,j]) %in% levels(trainFactorImputed[,j]))]
+      levels(trainFactorImputed[,j]) = c(levels(trainFactorImputed[,j]), missedLevels)
+    }
+    testFactorImputed = as.data.frame(sapply(1:length(varModes),
+                                             function(x) factor(ifelse(is.na(testFactor[,x]),
+                                                                       varModes[x],
+                                                                       paste(testFactor[,x])),
+                                                                levels = levels(trainFactorImputed[,x]))))
+    names(testFactorImputed) = names(testFactor)
+    #Combine numeric and factor variables and save over the previous datasets.
+    listOfDatasets$Training[[i]] = cbind.data.frame(trainNumericImputed, trainFactorImputed)
+    listOfDatasets$Testing[[i]] = cbind.data.frame(testNumericImputed, testFactorImputed)
+  }
+  return(listOfDatasets)
+}
+
+normalizeVariables = function(listOfImputedDatasets, numberOfFolds){
+  for(i in 1:numberOfFolds){
+    train = listOfImputedDatasets$Training[[i]]
+    test = listOfImputedDatasets$Testing[[i]]
+    #We shouldn't need na.rm = T anymore so we will remove it.
+    timeDeltaInd = which(names(train) %in% c("time","delta"))
+    timeDeltaTrain = train[,timeDeltaInd]
+    timeDeltaTest = test[,timeDeltaInd]
+    
+    
+    #For numeric variables:
+    trainNumeric = train[,-timeDeltaInd][,sapply(train[,-timeDeltaInd],is.numeric), drop=FALSE]
+    testNumeric = test[,-timeDeltaInd][,sapply(test[,-timeDeltaInd],is.numeric), drop = FALSE]
+    varMeans = apply(trainNumeric,2,mean)
+    varSD = apply(trainNumeric, 2, sd)
+    trainNumericNormalized = apply(trainNumeric, 2, function(x) (x-mean(x))/sd(x))
+    #The function is more complex for test because we have to specify the means and sd of the TRAINING set as we go through 
+    #the columns of the test set.
+    testNumericNormalized = as.data.frame(sapply(1:length(varMeans), function(x) (testNumeric[x] - varMeans[x])/varSD[x]))
+    names(testNumericNormalized) = names(testNumeric)
+    
+    #For the factor variables:
+    trainFactor = train[,-timeDeltaInd][,sapply(train[,-timeDeltaInd],is.factor), drop=FALSE]
+    testFactor = test[,-timeDeltaInd][,sapply(test[,-timeDeltaInd],is.factor), drop = FALSE]
+    
+    #fullRank =T drops one of the extra columns.
+    oneHotEncoder = dummyVars("~.",data = trainFactor, fullRank = T)
+    trainFactorEncoded = predict(oneHotEncoder, trainFactor)
+    testFactorEncoded = predict(oneHotEncoder, testFactor)
+    
+    #Combine one-hot encoded factor variables and normalized numeric variables and save them as th
+    listOfImputedDatasets$Training[[i]] = cbind.data.frame(timeDeltaTrain,trainNumericNormalized, trainFactorEncoded)
+    listOfImputedDatasets$Testing[[i]] = cbind.data.frame(timeDeltaTest,testNumericNormalized, testFactorEncoded)
+  }
+  return(listOfImputedDatasets)
+}
 
 
 
