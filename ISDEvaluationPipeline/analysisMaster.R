@@ -50,7 +50,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
                           CoxKP = T, KaplanMeier = T, RSF = T, AFT = T,
                           DCal = T, OneCal = T, Concordance = T, L1 = T, L2 = T, Brier = T,
                           OneCalTime = c(), BrierTime = c(), DCalBins = 10, LMeasure = "mean",
-                          AFTDistribution = "weibull", ntree = 1000){
+                          AFTDistribution = "weibull", ntree = 1000, numberBrierPoints = NULL){
   validatedData = validateAndClean(survivalDataset)
   normalizedData = createFoldsAndNormalize(validatedData, numberOfFolds)
   evaluationResults = data.frame()
@@ -93,8 +93,8 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       ConcResults = rbind(coxConc, kmConc, rsfConc, aftConc)
     }
     if(Brier){
-      if(length(BrierTime)==0)
-        stop("Please enter a time for the Brier score or change Brier to FALSE")
+      if(length(BrierTime)==0 | length(BrierTime) > 2)
+        stop("Please enter a time (length 1 or 2) for the Brier score or change Brier to FALSE")
       coxBrier = BrierScore(coxMod, BrierTime)
       kmBrier = BrierScore(kmMod, BrierTime)
       rsfBrier = BrierScore(rsfMod, BrierTime)
