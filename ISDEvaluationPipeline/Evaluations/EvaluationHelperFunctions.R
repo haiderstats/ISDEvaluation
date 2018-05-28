@@ -32,27 +32,27 @@ predictProbabilityFromCurve = function(survivalCurve,predictedTimes, timeToPredi
 #predicted time points.
 predictMeanSurvivalTimeKM = function(survivalCurve, predictedTimes){
   differences = diff(predictedTimes)
-  area = sum(differences*survivalCurve)
+  area = sum(differences*survivalCurve[-length(survivalCurve)])
   return(area)
 }
 
 predictMedianSurvivalTimeKM = function(survivalCurve, predictedTimes){
-  medianIndex = sindex(as.vector(t(survivalCurve)), 0.5, comp = "greater")+1
+  medianIndex = sindex(survivalCurve, 0.5, comp = "greater")+1
   medianTime = predictedTimes[medianIndex]
   return(ifelse(is.na(medianTime), max(predictedTimes), medianTime))
 }
 
 predictMeanSurvivalTimeLinear = function(survivalCurve, predictedTimes){
   differences = diff(predictedTimes)
-  idx = 1:nrow(survivalCurve)
+  idx = 1:length(survivalCurve)
   #Here we take the area of a right trapezoid. See http://mathworld.wolfram.com/RightTrapezoid.html. Also note we remove the last value (it's
   #NA because we go past the last row of the survivalCurve.)
-  area = sum(0.5*differences*(survivalCurve[idx,] + survivalCurve[idx+1,])[-nrow(survivalCurve)])
+  area = sum(0.5*differences*(survivalCurve[idx] + survivalCurve[idx+1])[-length(survivalCurve)])
   return(area)
 }
 
 predictMedianSurvivalTimeLinear = function(survivalCurve, predictedTimes){
-  medianIndexLower = sindex(as.vector(t(survivalCurve)), 0.5, comp = "greater")
+  medianIndexLower = sindex(survivalCurve, 0.5, comp = "greater")
   medianIndexHigher = medianIndexLower +1
   if(is.na(predictedTimes[medianIndexHigher]))
     return(max(predictedTimes))
@@ -60,8 +60,8 @@ predictMedianSurvivalTimeLinear = function(survivalCurve, predictedTimes){
     timeA = predictedTimes[medianIndexLower]
     timeB = predictedTimes[medianIndexHigher]
     
-    probA = survivalCurve[medianIndexLower,]
-    probB = survivalCurve[medianIndexHigher,]
+    probA = survivalCurve[medianIndexLower]
+    probB = survivalCurve[medianIndexHigher]
     #Point on a line formula since we assume survival probability is linear between time points.
     #Also, we have an ifelse to catch the event where timeA == timeB, i.e. we are on the last time point, in this case we should add 0.
     toReturn = timeA + (0.5 - probA)*(timeB - timeA)/(probB - probA)
