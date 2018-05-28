@@ -49,8 +49,10 @@ singleBrier = function(survMod, BrierTime){
   weightCat2[is.na(weightCat2)] = 0
   
   predictedTimes = survMod[[1]][,1]
-  survivalCurves = survMod[[1]][,-1]
-  predictions = apply(survivalCurves,2, function(z) predictProbabilityFromCurve(z,predictedTimes,BrierTime))
+  #Take the survival curves, remove the times column, and then order the curves by the order in which they died. We have to order them to line up
+  #with the weight vectors.
+  survivalCurvesOrdered = survMod[[1]][,-1][orderOfTimes]
+  predictions = apply(survivalCurvesOrdered,2, function(z) predictProbabilityFromCurve(z,predictedTimes,BrierTime))
   bScore = mean(predictions^2*weightCat1 + (1-predictions)^2*weightCat2)
   return(bScore)
 }
