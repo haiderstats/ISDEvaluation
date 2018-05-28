@@ -70,10 +70,10 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     #Evaluations - Note that if evaluations are passed a NULL value they return a NULL.
     DCalResults = NULL;OneCalResults = NULL;ConcResults = NULL;BrierResults = NULL;L1Results = NULL; L2Results = NULL; 
     if(DCal){
-      coxDcal = DCalibration(coxMod, DCalBinds)
-      kmDcal = DCalibration(kmMod, DCalBinds)
-      rsfDcal = DCalibration(rsfMod, DCalBinds)
-      aftDcal = DCalibration(aftMod, DCalBinds)
+      coxDcal = DCalibration(coxMod, DCalBins)
+      kmDcal = DCalibration(kmMod, DCalBins)
+      rsfDcal = DCalibration(rsfMod, DCalBins)
+      aftDcal = DCalibration(aftMod, DCalBins)
       DCalResults = rbind(coxDcal, kmDcal, rsfDcal,aftDcal)
     }
     if(OneCal){
