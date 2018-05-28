@@ -11,6 +11,7 @@
 #a vector of two time points (e.g. c(0,50)) for integrated Brier Score, and the number of bins for D-Calibration. Further, for the 
 #L1 and L2 measures we need to specify if we want to use the mean or median.
 #Also indicate evaluation metrics and models wanted, default is for all models and evaluation metrics to be computed.
+#Additionally, we allow to take in additional model information, e.g. number of survival trees and distribution for AFT.
 #Output: A CSV containing averaged evaluation results for each model across the K folds.
 ############################################################################################################################################
 #Dependencies
@@ -48,7 +49,8 @@ survivalDataset[1:5, 4] = NA
 analysisMaster = function(survivalDataset, numberOfFolds,
                           CoxKP = T, KaplanMeier = T, RSF = T, AFT = T,
                           DCal = T, OneCal = T, Concordance = T, L1 = T, L2 = T, Brier = T,
-                          OneCalTime = c(), BrierTime = c(), DCalBins = 10, LMeasure = "mean", AFTDistribution = "weibull"){
+                          OneCalTime = c(), BrierTime = c(), DCalBins = 10, LMeasure = "mean",
+                          AFTDistribution = "weibull", ntree = 1000){
   validatedData = validateAndClean(survivalDataset)
   normalizedData = createFoldsAndNormalize(validatedData, numberOfFolds)
   evaluationResults = data.frame()

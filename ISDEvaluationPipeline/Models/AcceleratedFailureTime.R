@@ -16,7 +16,7 @@
 #Output: A list of (1) matrix of survival curves, and (2) the true death times.
 ############################################################################################################################################
 #Library Dependencies
-#survival is needed to get survfit and the implimentation of the KP estimator.
+#survival is needed to get survreg for the AFT model.
 library(survival)
 
 AFT = function(training, testing, AFTDistribution){
