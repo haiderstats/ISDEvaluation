@@ -48,7 +48,7 @@ survivalDataset[1:5, 4] = NA
 analysisMaster = function(survivalDataset, numberOfFolds,
                           CoxKP = T, KaplanMeier = T, RSF = T, AFT = T,
                           DCal = T, OneCal = T, Concordance = T, L1 = T, L2 = T, Brier = T,
-                          OneCalTime = c(), BrierTime = c(), DCalBins = 10, LMeasure = "mean"){
+                          OneCalTime = c(), BrierTime = c(), DCalBins = 10, LMeasure = "mean", AFTDistribution = "weibull"){
   validatedData = validateAndClean(survivalDataset)
   normalizedData = createFoldsAndNormalize(validatedData, numberOfFolds)
   evaluationResults = data.frame()
@@ -64,7 +64,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     if(RSF)
       rsfMod = RSF(training, testing)
     if(AFT)
-      aftMod = AFT(training, testing)
+      aftMod = AFT(training, testing, AFTDistribution)
     #Evaluations - Note that if evaluations are passed a NULL value they return a NULL.
     DCalResults = NULL;OneCalResults = NULL;ConcResults = NULL;BrierResults = NULL;L1Results = NULL; L2Results = NULL; 
     if(DCal){
