@@ -62,7 +62,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     if(CoxKP)
       coxMod = CoxPH_KP(training, testing)
     if(KaplanMeier)
-      kmMod = KaplanMeier(training, testing)
+      kmMod = KM(training, testing)
     if(RSF)
       rsfMod = RSF(training, testing)
     if(AFT)
