@@ -24,7 +24,7 @@ CoxPH_KP = function(training, testing){
   curvesToReturn = cbind.data.frame(time = timePoints, probabilities)
   timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
-  return(list(curvesToReturn, timesAndCensTest,timeAndCensTrain))  
+  return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))  
 }
 
 

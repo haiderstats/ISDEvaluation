@@ -31,7 +31,7 @@ AFT = function(training, testing, AFTDistribution){
   probabilityMatrix = matrix(probabilities, ncol = nrow(testing),byrow = T)
   timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
-  return(list(curvesToReturn, timesAndCensTest,timeAndCensTrain))   
+  return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))   
 }
 
 #The following was taken and altered from http://rstudio-pubs-static.s3.amazonaws.com/161203_6ee743eb28df4cd68089a519aa705123.html.
