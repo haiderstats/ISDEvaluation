@@ -4,45 +4,54 @@
 #Email: hshaider@ualberta.ca
 
 #Purpose and General Comments:
-#This file was created to implement concordance as an evaluation measure for individual survival curves.
+#This file was created to implement concordance as an evaluation measure for individual survival curves. 
 #Input 1: A list of (1) a matrix of survival curves, and (2) the true death times and event/censoring indicator (delta =1 implies death/event).
-#Output: The C-index score.
+#Input 2: A string indicating the way ties should be handled. Options: "None" will throw out all ties in survival time and all ties from
+#risk scores. "Time" includes ties in survival time but removes ties in risk scores. "Risk" includes ties in risk scores but not in survival
+#time. "All" includes all ties (both in survival time and in risk scores). Note the concordance calculation is given by
+#(Concordant Pairs + (Number of Ties/2))/(Concordant Pairs + Discordant Pairs + Number of Ties)
+#Currently a "risk" score for a survival distribution model is considered to be the mean survival time. 
+#Output: The C-index.
 ##############################################################################################################################################
 #Library Dependencies
-#We use this for the sindex function.
-library(prodlim)
+#We use this for the survConcordance function.
+library(survival)
 #We use this for ldply, a combiner of lists.
 library(plyr)
-#Helper Functions: predictProbabilityFromCurve(survivalCurve,predictedTimes, timeToPredict)
+#Helper Functions: predictMeanSurvivalTimeLinear(survivalCurve,predictedTimes)
 source("Evaluations/EvaluationHelperFunctions.R")
 
-Concordance = function(survMod){
+Concordance = function(survMod, ties = "None"){
+  if(!ties %in% c("None","Risk","Time","All"))
+    stop("Please enter one of: 'None', 'Risk','Time', or 'All' as the ties argument.")
   predictedTimes = survMod[[1]][,1]
   survivalCurves = survMod[[1]][-1]
   trueDeathTimes = survMod[[2]][,1]
   censorStatus = survMod[[2]][,2]
+  
   #This retrieves the death probability of the survival curve at the true time of death.
   averageSurvivalTimes = unlist(lapply(seq_along(trueDeathTimes),
-                                     function(index) predictMeanSurvivalTimeLinear(survivalCurves[,index],
-                                                                                 predictedTimes)))
-  orderDeathTimes = order(trueDeathTimes)
-  sortedDeathTimes = sort(trueDeathTimes)
-  #TODO:
-  #Currently we use the mean time as a "risk score". How do survival curves produce concordance? We have survival probabilities for every time...
-  #but what time should we use? When an individual dies.... and compare it to what - the same time for every other individual?
-  #Another option is to test if mean/median survival times are concordant. If one individual dies before another we would expect
-  #their average expected time should be lower.
-  #TODO:
-  #How should we handle ties?
-  trueMatrix = ldply(lapply(seq_along(sortedDeathTimes), function(x) as.numeric(sortedDeathTimes[x] < sortedDeathTimes  &
-                                                                                  censorStatus[orderDeathTimes][x])),rbind)
-  estimatedMatrix = ldply(lapply(seq_along(sortedDeathTimes),
-                                 function(x) as.numeric(sortedDeathTimes[x] < sortedDeathTimes  &
-                                                        censorStatus[orderDeathTimes][x]&
-                                                          averageSurvivalTimes[orderDeathTimes][x] < averageSurvivalTimes[orderDeathTimes])),rbind)
-  sum(estimatedMatrix)/sum(trueMatrix)
-   return()
+                                       function(index) predictMeanSurvivalTimeLinear(survivalCurves[,index],
+                                                                                     predictedTimes)))
+  risk = -1*averageSurvivalTimes
+  concordanceInfo = survConcordance(Surv(testing$time, testing$delta)~ risk)
+  concordantPairs= concordanceInfo$stats[1]
+  discordantPairs = concordanceInfo$stats[2]
+  riskTies = concordanceInfo$stats[3]
+  timeTies = concordanceInfo$stats[4]
+  CIndex = switch(ties,
+                  None = concordantPairs/(concordantPairs + discordantPairs),
+                  Time = (concordantPairs+timeTies/2)/(concordantPairs + discordantPairs + timeTies),
+                  Risk = (concordantPairs+riskTies/2)/(concordantPairs + discordantPairs + riskTies),
+                  All = (concordantPairs+(riskTies +timeTies)/2)/(concordantPairs + discordantPairs + timeTies + riskTies)
+  )
+  return(CIndex)
 }
+
+
+
+
+
 
 
 
