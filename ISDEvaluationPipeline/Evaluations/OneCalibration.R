@@ -21,7 +21,7 @@ source("Evaluations/EvaluationHelperFunctions.R")
 #type %in% c("Uncensored","Fractional","BucketKM")
 OneCalibration = function(survMod, timeOfInterest = NULL, type, numBuckets){
   predictedTimes = survMod[[1]]$time
-  survivalCurves = survMod[[1]][-1] #removes time predicted times.
+  survivalCurves = survMod[[1]][-1] #removes predicted times.
   trueDeathTimes = survMod[[2]]$time
   censorStatus = survMod[[2]]$delta
   #If time is null, we will select the median from the training instances (of those who were uncensored.)
@@ -45,49 +45,53 @@ OneCalibration = function(survMod, timeOfInterest = NULL, type, numBuckets){
   timeFrame = data.frame(time = trueDeathTimes[orderPredictions],
                          label = bucketLabel,
                          delta = censorStatus[orderPredictions])
-  if(type == "Uncensored"){
-    bucketSurvival = orderedPredictionFrame  %>%
-                      group_by(label) %>% 
-                      filter(delta ==1 | (delta ==0 & time >= timeOfInterest)) %>%
-                      summarise(survivalPrediction = mean(prob))
-    numDied = timeFrame  %>%
-              group_by(label) %>%
-              filter(delta ==1| (delta ==0 & time >= timeOfInterest)) %>%
-              summarise(deadCount = length(which(time < timeOfInterest)))
-    observed = numDied$deadCount
-    expected = bucketSizes*(1-bucketSurvival$survivalPrediction)
-    HLStat = sum((observed-expected)^2/(bucketSizes*(1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction))
-    pval = 1-pchisq(HLStat, numBuckets-2)
-    return(pval)
-  }
-  if(type == "Fractional"){
-    KM = prodlim(Surv(time,delta)~1, data = survMod[[3]])
-    bucketSurvival = orderedPredictionFrame  %>% 
+  pval = switch(type,
+                Uncensored = {
+                  bucketSurvival = orderedPredictionFrame  %>%
+                    group_by(label) %>% 
+                    filter(delta ==1 | (delta ==0 & time >= timeOfInterest)) %>%
+                    summarise(survivalPrediction = mean(prob))
+                  numDied = timeFrame  %>%
+                    group_by(label) %>%
+                    filter(delta ==1| (delta ==0 & time >= timeOfInterest)) %>%
+                    summarise(deadCount = length(which(time < timeOfInterest)))
+                  observed = numDied$deadCount
+                  expected = bucketSizes*(1-bucketSurvival$survivalPrediction)
+                  HLStat = sum((observed-expected)^2/(bucketSizes*(1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction))
+                  pval = 1-pchisq(HLStat, numBuckets-2)
+                },
+                Fractional = {
+                  KM = prodlim(Surv(time,delta)~1, data = survMod[[3]])
+                  bucketSurvival = orderedPredictionFrame  %>% 
                     group_by(label) %>%
                     summarise(survivalPrediction = mean(prob))
-    numDied = timeFrame  %>%
-              #Case 1: Uncensored and died before time of interest, cost = 1.
-              #Case 2: Censored before time of interest, use fractional person method for cost. 
-              #Case 3: Either uncensored but died after time of interest or censored at or after time of interest, cost = 0.
-              mutate(contribution = ifelse(delta == 1 & time <= timeOfInterest,1,
-                                           ifelse(delta == 0 & time < timeOfInterest, predict(KM,timeOfInterest)/predict(KM,time,level.chaos=2), 0))) %>%
-              group_by(label) %>%
-              summarise(deadCount = sum(contribution))
-    observed = numDied$deadCount
-    expected = bucketSizes*(1-bucketSurvival$survivalPrediction)
-    HLStat = sum((observed-expected)^2/(bucketSizes*(1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction))
-    pval = 1-pchisq(HLStat, numBuckets-2)
-    return(pval)
-  }
-  if(type == "BucketKM"){
-    bucketSurvival = orderedPredictionFrame  %>% group_by(label) %>% filter(delta ==1) %>% summarise(survivalPrediction = mean(prob))
-    numDied = timeFrame  %>% group_by(label) %>% filter(delta ==1) %>% summarise(deadCount = length(which(time < timeOfInterest)))
-    observed = numDied$deadCount
-    expected = bucketSizes*(1-bucketSurvival$survivalPrediction)
-    HLStat = sum((observed-expected)^2/(bucketSizes*(1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction))
-    pval = 1-pchisq(HLStat, numBuckets-2)
-    return(pval)
-  }
+                  numDied = timeFrame  %>%
+                    #Case 1: Uncensored and died before time of interest, cost = 1.
+                    #Case 2: Censored before time of interest, use fractional person method for cost. 
+                    #Case 3: Either uncensored but died after time of interest or censored at or after time of interest, cost = 0.
+                    mutate(contribution = ifelse(delta == 1 & time <= timeOfInterest, 1,
+                                                 ifelse(delta == 0 & time < timeOfInterest,
+                                                        predict(KM,timeOfInterest)/predict(KM,time,level.chaos=2), 0))) %>%
+                    group_by(label) %>%
+                    summarise(deadCount = sum(contribution))
+                  observed = numDied$deadCount
+                  expected = bucketSizes*(1-bucketSurvival$survivalPrediction)
+                  HLStat = sum((observed-expected)^2/(bucketSizes*(1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction))
+                  pval = 1-pchisq(HLStat, numBuckets-2)
+                },
+                BucketKM = {
+                  bucketSurvival = orderedPredictionFrame  %>%
+                    group_by(label) %>%
+                    summarise(survivalPrediction = mean(prob))
+                  numDied = timeFrame  %>%
+                    group_by(label) %>%
+                    summarise(deadCount = 1 - predict(prodlim(Surv(time, delta)~1),timeOfInterest))
+                  observed = numDied$deadCount
+                  expected = 1-bucketSurvival$survivalPrediction
+                  HLStat = sum((observed-expected)^2/((1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction))
+                  pval = 1-pchisq(HLStat, numBuckets-1)
+                })
+  return(pval)
 }
 
 
