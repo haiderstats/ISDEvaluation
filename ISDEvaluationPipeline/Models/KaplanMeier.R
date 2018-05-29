@@ -22,8 +22,9 @@ KM = function(training, testing){
   timesToPredict = c(0,sort(unique(training$time)))
   probabilities = predict(kmMod,timesToPredict)
   curvesToReturn = cbind.data.frame(time = timesToPredict,matrix(rep(probabilities,nrow(testing)),ncol = nrow(testing)))
-  timesAndCens = cbind.data.frame(time = testing$time, delta = testing$delta)
-  return(list(curvesToReturn, timesAndCens))  
+  timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
+  timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
+  return(list(curvesToReturn, timesAndCensTest,timeAndCensTrain))   
 }
 
 

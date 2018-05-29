@@ -26,8 +26,9 @@ RSF = function(training, testing, ntree){
   probabilities = rbind.data.frame(1,t(survivalCurves$survival))
   times = c(sort(unique(training$time*training$delta)))
   curvesToReturn = cbind.data.frame(time = times, probabilities)
-  timesAndCens = cbind.data.frame(time = testing$time, delta = testing$delta)
-  return(list(curvesToReturn, timesAndCens))  
+  timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
+  timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
+  return(list(curvesToReturn, timesAndCensTest,timeAndCensTrain))  
 }
 
 
