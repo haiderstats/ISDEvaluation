@@ -47,10 +47,12 @@ survivalDataset[1:5, 4] = NA
 
 
 analysisMaster = function(survivalDataset, numberOfFolds,
-                          CoxKP = T, KaplanMeier = T, RSF = T, AFT = T,
-                          DCal = T, OneCal = T, Concordance = T, L1 = T, L2 = T, Brier = T,
-                          OneCalTime = c(), BrierTime = c(), DCalBins = 10, LMeasure = "mean",
-                          AFTDistribution = "weibull", ntree = 1000, numberBrierPoints = NULL){
+                          CoxKP = T, KaplanMeier = T, RSF = T, AFT = T, #Models
+                          DCal = T, OneCal = T, Concor = T, L1Measure = T, L2Measure = T, Brier = T, #Evaluations
+                          OneCalTime = c(), BrierTime = c(), DCalBins = 10, LMeasure = "meanLinear", Ltype = "Hinge", Llog = F, #Evaluation args
+                          numberBrierPoints = NULL, concordanceTies = "None", typeOneCal = "BucketKM", oneCalBuckets = 10, #Evaluation args
+                          AFTDistribution = "weibull", ntree = 1000 #Model args
+                          ){
   validatedData = validateAndClean(survivalDataset)
   normalizedData = createFoldsAndNormalize(validatedData, numberOfFolds)
   evaluationResults = data.frame()
@@ -79,17 +81,17 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     if(OneCal){
       if(length(OneCalTime)==0)
         stop("Please enter a time for One Calibration or change OneCal to FALSE")
-      coxOneCal = OneCalibration(coxMod, OneCalTime)
-      kmOneCal = OneCalibration(kmMod, OneCalTime)
-      rsfOneCal = OneCalibration(rsfMod, OneCalTime)
-      aftOneCal = OneCalibration(aftMod, OneCalTime)
+      coxOneCal = OneCalibration(coxMod, OneCalTime, typeOneCal, oneCalBuckets)
+      kmOneCal = OneCalibration(kmMod, OneCalTime, typeOneCal, oneCalBuckets)
+      rsfOneCal = OneCalibration(rsfMod, OneCalTime, typeOneCal, oneCalBuckets)
+      aftOneCal = OneCalibration(aftMod, OneCalTime, typeOneCal, oneCalBuckets)
       OneCalResults = rbind(coxOneCal, kmOneCal, rsfOneCal,aftOneCal)
     }
-    if(Concordance){
-      coxConc = ConcordanceEval(coxMod)
-      kmConc = ConcordanceEval(kmMod)
-      rsfConc = ConcordanceEval(rsfMod)
-      aftConc = ConcordanceEval(aftMod)
+    if(Concor){
+      coxConc = Concordance(coxMod, concordanceTies)
+      kmConc = Concordance(kmMod, concordanceTies)
+      rsfConc = Concordance(rsfMod, concordanceTies)
+      aftConc = Concordance(aftMod, concordanceTies)
       ConcResults = rbind(coxConc, kmConc, rsfConc, aftConc)
     }
     if(Brier){
@@ -101,18 +103,18 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       aftBrier = BrierScore(aftMod, BrierTime)
       BrierResults = rbind(coxBrier, kmBrier, rsfBrier, aftBrier)
     }
-    if(L1){
-      coxL1 = L1Eval(coxMod, LMeasure)
-      kmL1 = L1Eval(kmMod, LMeasure)
-      rsfL1 = L1Eval(rsfMod, LMeasure)
-      aftL1 = L1Eval(aftMod, LMeasure)
+    if(L1Measure){
+      coxL1 = L1(coxMod, LMeasure, Ltype, Llog)
+      kmL1 = L1(kmMod, LMeasure, Ltype, Llog)
+      rsfL1 = L1(rsfMod, LMeasure, Ltype, Llog)
+      aftL1 = L1(aftMod, LMeasure, Ltype, Llog)
       L1Results = rbind(coxL1,kmL1,rsfL1,aftL1)
     }
-    if(L2){
-      coxL2 = L2Eval(coxMod, LMeasure)
-      kmL2 = L2Eval(kmMod, LMeasure)
-      rsfL2 = L2Eval(rsfMod, LMeasure)
-      aftL2 = L2Eval(aftMod, LMeasure)
+    if(L2Measure){
+      coxL2 = L2(coxMod, LMeasure, Ltype, Llog)
+      kmL2 = L2(kmMod, LMeasure, Ltype, Llog)
+      rsfL2 = L2(rsfMod, LMeasure, Ltype, Llog)
+      aftL2 = L2(aftMod, LMeasure, Ltype, Llog)
       L2Results = rbind(coxL2,kmL2,rsfL2,aftL2)
     }
     toAdd = as.data.frame(cbind(DCalResults, OneCalResults, ConcResults, BrierResults, L1Results, L2Results))
