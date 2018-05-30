@@ -35,6 +35,7 @@ OneCalibration = function(survMod, timeOfInterest = NULL, type, numBuckets){
   #https://math.stackexchange.com/questions/199690/divide-n-items-into-m-groups-with-as-near-equal-size-as-possible
   numberOfBucketsWithExtra = length(predictions) %% numBuckets
   numberOfBucketsWithoutExtra = numBuckets - numberOfBucketsWithExtra
+  set.seed(42)
   bucketSizes = sample(c(rep(floor(length(predictions)/numBuckets)+1, numberOfBucketsWithExtra),
                          rep(floor(length(predictions)/numBuckets), numberOfBucketsWithoutExtra)))
   bucketLabel = rep(1:numBuckets, times = bucketSizes)
@@ -88,7 +89,7 @@ OneCalibration = function(survMod, timeOfInterest = NULL, type, numBuckets){
                     summarise(deadCount = 1 - predict(prodlim(Surv(time, delta)~1),timeOfInterest))
                   observed = numDied$deadCount
                   expected = 1-bucketSurvival$survivalPrediction
-                  HLStat = sum((observed-expected)^2/((1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction))
+                  HLStat = sum((bucketSizes*(observed-expected)^2)/((1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction))
                   pval = 1-pchisq(HLStat, numBuckets-1)
                 })
   return(pval)
