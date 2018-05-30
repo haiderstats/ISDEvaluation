@@ -24,6 +24,7 @@ library(prodlim)
 source("Evaluations/EvaluationHelperFunctions.R")
 
 BrierScore = function(survMod, BrierTime, numberBrierPoints = NULL){
+  if(is.null(survMod)) return(NULL)
   score = ifelse(length(BrierTime) ==1,
                  singleBrier(survMod, BrierTime),
                  integratedBrier(survMod, BrierTime, numberBrierPoints))

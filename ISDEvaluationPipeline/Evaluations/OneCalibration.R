@@ -25,6 +25,7 @@ library(dplyr)
 source("Evaluations/EvaluationHelperFunctions.R")
 
 OneCalibration = function(survMod, timeOfInterest = NULL, type = "BucketKM", numBuckets = 10){
+  if(is.null(survMod)) return(NULL)
   if(!type %in% c("Uncensored","Fractional","BucketKM"))
     stop("Please enter one of 'Uncensored','Fractional','BucketKM' for type.")
   predictedTimes = survMod[[1]]$time

@@ -18,6 +18,7 @@ library(plyr)
 source("Evaluations/EvaluationHelperFunctions.R")
 
 DCalibration = function(survMod, numBins){
+  if(is.null(survMod)) return(NULL)
   predictedTimes = survMod[[1]][,1]
   survivalCurves = survMod[[1]][-1]
   trueDeathTimes = survMod[[2]][,1]

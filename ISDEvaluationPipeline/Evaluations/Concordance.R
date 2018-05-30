@@ -22,6 +22,7 @@ library(plyr)
 source("Evaluations/EvaluationHelperFunctions.R")
 
 Concordance = function(survMod, ties = "None"){
+  if(is.null(survMod)) return(NULL)
   if(!ties %in% c("None","Risk","Time","All"))
     stop("Please enter one of: 'None', 'Risk','Time', or 'All' as the ties argument.")
   predictedTimes = survMod[[1]][,1]

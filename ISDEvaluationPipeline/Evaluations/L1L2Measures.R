@@ -17,6 +17,7 @@ library(plyr)
 source("Evaluations/EvaluationHelperFunctions.R")
 
 L1 = function(survMod, Lmeasure = "meanLinear", type = "Uncensored", logScale = F){
+  if(is.null(survMod)) return(NULL)
   predictedTimes = survMod[[1]][,1]
   survivalCurves = survMod[[1]][-1]
   trueDeathTimes = survMod[[2]][,1]
