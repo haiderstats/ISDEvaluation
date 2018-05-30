@@ -108,6 +108,7 @@ OneCalibration = function(survMod, timeOfInterest = NULL, type = "BucketKM", num
                   observed = numDied$deadCount
                   expected = 1-bucketSurvival$survivalPrediction
                   HLStat = sum((bucketSizes*(observed-expected)^2)/((1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction))
+                  #See comments in file header for reasoning of degree of freedom choice.
                   DoF = ifelse(numBuckets > 15, numBuckets -2, numBuckets-1)
                   pval = 1-pchisq(HLStat, DOF)
                 })
