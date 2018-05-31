@@ -19,10 +19,25 @@ source("Evaluations/EvaluationHelperFunctions.R")
 
 DCalibration = function(survMod, numBins){
   if(is.null(survMod)) return(NULL)
+  combinedBins = getBinned(survMod, numBins)
+  pvalue = chisq.test(combinedBins)$p.value
+  return(pvalue)
+}
+
+DCalibrationCumulative = function(listOfSurvivalModels, numBins){
+  if(length(listOfSurvivalModels) == 0) return(NULL)
+  #Here we apply getBinned to every survival model, stack the bins into a matrix, and sum the columns to get the total bin values.
+  combinedBins =colSums(ldply(lapply(seq_along(listOfSurvivalModels), function(x) getBinned(listOfSurvivalModels[[x]], numBins)), rbind))
+  pvalue = chisq.test(combinedBins)$p.value
+  return(pvalue)
+}
+
+
+getBinned = function(survMod,numBins){
   predictedTimes = survMod[[1]][,1]
   survivalCurves = survMod[[1]][-1]
-  trueDeathTimes = survMod[[2]][,1]
-  censorStatus = survMod[[2]][,2]
+  trueDeathTimes = survMod[[2]]$time
+  censorStatus = survMod[[2]]$delta
   quantiles = 1 - seq(0,1,length.out = numBins+1)
   #This retrieves the death probability the survival curve gave at the true time of death.
   deathProbabilities = unlist(lapply(seq_along(trueDeathTimes),
@@ -32,17 +47,23 @@ DCalibration = function(survMod, numBins){
   uncensoredProbabilities = deathProbabilities[as.logical(censorStatus)]
   binIndex = seq_along(quantiles)[-1]
   uncensoredBinning = unlist(lapply(binIndex, function(x) length(which(uncensoredProbabilities >= quantiles[x] &
-                                                                       uncensoredProbabilities < quantiles[x-1]))))
+                                                                         uncensoredProbabilities < quantiles[x-1]))))
   censoredProbabilities = deathProbabilities[as.logical(1-censorStatus)]
   censoredBinPositions = sindex(quantiles, censoredProbabilities)
-  percentToAdd = 1/(numBins - censoredBinPositions +1)
+  percentToAdd = 1/((numBins - censoredBinPositions +1))
   #This is a list where each element is is a numBins length vector with 0s prior to the bin where the censored individual landed and 
   #a fraction that they contribute to each bin in all the following bins. This list is then composed into a matrix and columns are summed
   #to add the approprate contribution to each bin for the censored individuals.
   listOfContributions = lapply(seq_along(censoredBinPositions),function(x) c(rep(0, censoredBinPositions[x] -1),
-                                                                              rep(percentToAdd[x], numBins - censoredBinPositions[x] +1)))
+                                                                             rep(percentToAdd[x], numBins - censoredBinPositions[x] +1)))
   censoredBinning = colSums(ldply(listOfContributions,rbind))
   combinedBins = uncensoredBinning + censoredBinning
-  pvalue = chisq.test(combinedBins)$p.value
-  return(pvalue)
+  return(combinedBins)
 }
+
+
+
+
+
+
+
