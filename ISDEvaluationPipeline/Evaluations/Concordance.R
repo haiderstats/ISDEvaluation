@@ -32,11 +32,11 @@ Concordance = function(survMod, ties = "None"){
   
   #This retrieves the mean death probability of the survival curve.
   averageSurvivalTimes = unlist(lapply(seq_along(trueDeathTimes),
-                                       function(index) predictMeanSurvivalTimeLinear(survivalCurves[,index],
+                                       function(index) predictMeanSurvivalTimeSpline(survivalCurves[,index],
                                                                                      predictedTimes)))
   #The risk score should be higher for subjects that live shorter (i.e. lower average survival time).
   risk = -1*averageSurvivalTimes
-  concordanceInfo = survConcordance(Surv(testing$time, testing$delta)~ risk)
+  concordanceInfo = survConcordance(Surv(trueDeathTimes, censorStatus)~ risk)
   concordantPairs= concordanceInfo$stats[1]
   discordantPairs = concordanceInfo$stats[2]
   riskTies = concordanceInfo$stats[3]
