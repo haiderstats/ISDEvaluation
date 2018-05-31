@@ -10,26 +10,61 @@
 #We use prodlim for the sindex function.
 library(prodlim)
 
-
-#We need some type of predict function for survival curves - here is one assuming the relationship between two time
-#points is linear in survival probability.
+#We need some type of predict function for survival curves - here we build a spline to fit the survival model curve. This spline is 
+#the montotone spline using the Fritsch-Carlson method, see https://en.wikipedia.org/wiki/Monotone_cubic_interpolation. Also see 
+#help(splinefun), specifically for method = "monoH.FC". Note that we make an alteration to the method because if the last two time points
+#have the same probability (y value) then the spline is constant outside of the training data. We need this to be a decreasing function
+#outside the training data so instead we take the last linear fit from the model and apply it to the last time point.
 predictProbabilityFromCurve = function(survivalCurve,predictedTimes, timeToPredict){
-  lowerTimeIndex = sindex(predictedTimes, timeToPredict)
-  upperTimeIndex = ifelse(lowerTimeIndex < length(predictedTimes),lowerTimeIndex+1,lowerTimeIndex)
-  
-  timeA = predictedTimes[lowerTimeIndex]
-  timeB = predictedTimes[upperTimeIndex]
-  
-  probA = survivalCurve[lowerTimeIndex]
-  probB = survivalCurve[upperTimeIndex]
-  #Point on a line formula since we assume survival probability is linear between time points.
-  #Also, we have an ifelse to catch the event where timeA == timeB, i.e. we are on the last time point, in this case we should add 0.
-  toReturn = probA + ifelse(timeB != timeA, ((timeToPredict - timeA)*(probB - probA))/(timeB - timeA),0)
-  return(toReturn)
+  spline = splinefun(predictedTimes, survivalCurve, method = "monoH.FC")
+  maxTime = max(predictedTimes)
+  differences = diff(spline(predictedTimes))
+  lastLinear = max(which(differences <0))
+  slope = differences[lastLinear]
+  predictedProbabilities = rep(0, length(timeToPredict))
+  linearChange = which(timeToPredict > maxTime)
+  predictedProbabilities[linearChange] = pmax(spline(maxTime) + (timeToPredict[linearChange] - maxTime)*slope,0)
+  predictedProbabilities[-linearChange] = spline(timeToPredict[-linearChange])
+  return(predictedProbabilities)
 }
 
-#We calculate the mean and median survival times here one for a KM way (stepwise functions) and the other as a more linear approach between
-#predicted time points.
+#We calculate the mean and median survival times assuming a monotone spline fit of the survival curve points.
+predictMeanSurvivalTimeSpline = function(survivalCurve, predictedTimes){
+  spline = splinefun(predictedTimes, survivalCurve, method = "monoH.FC")
+  maxTime = max(predictedTimes)
+  differences = diff(spline(predictedTimes))
+  lastLinear = max(which(differences <0))
+  slope = differences[lastLinear]
+  zeroProbabilitiyTime = maxTime + -spline(maxTime)/slope
+  splineWithLinear = function(time) ifelse(time < maxTime, spline(time),spline(maxTime) + (time - maxTime)*slope)
+  area = integrate(splineWithLinear,0, zeroProbabilitiyTime)[[1]]
+  return(area)
+}
+
+predictMedianSurvivalTimeSpline = function(survivalCurve, predictedTimes){
+  spline = splinefun(predictedTimes, survivalCurve, method = "monoH.FC")
+  minProb = min(spline(predictedTimes))
+  if(minProb < .5){
+    maximumSmallerThanMedian = predictedTimes[min(which(survivalCurve <.5))]
+    minimumGreaterThanMedian = predictedTimes[max(which(survivalCurve >.5))]
+    splineInv = splinefun(spline(seq(minimumGreaterThanMedian, maximumSmallerThanMedian, length.out = 1000)),
+                          seq(minimumGreaterThanMedian, maximumSmallerThanMedian, length.out = 1000))
+    medianProbabilityTime = splineInv(0.5)
+  }
+  else{
+    differences = diff(spline(predictedTimes))
+    lastLinear = max(which(differences <0))
+    slope = differences[lastLinear]
+    medianProbabilityTime = maxTime + (0.5-spline(maxTime))/slope
+  }
+  return(medianProbabilityTime)
+}
+
+
+
+
+
+#We calculate the mean and median survival times assuming a stepwise function (the KM type curve)
 predictMeanSurvivalTimeKM = function(survivalCurve, predictedTimes){
   differences = diff(predictedTimes)
   area = sum(differences*survivalCurve[-length(survivalCurve)])
@@ -42,6 +77,8 @@ predictMedianSurvivalTimeKM = function(survivalCurve, predictedTimes){
   return(ifelse(is.na(medianTime), max(predictedTimes), medianTime))
 }
 
+
+#We calculate the mean and median survival times assuming a linear function between time points.
 predictMeanSurvivalTimeLinear = function(survivalCurve, predictedTimes){
   differences = diff(predictedTimes)
   idx = 1:length(survivalCurve)
