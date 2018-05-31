@@ -47,7 +47,7 @@ survivalDataset[1:5, 4] = NA
 
 
 analysisMaster = function(survivalDataset, numberOfFolds,
-                          CoxKP = T, KaplanMeier = T, RSF = T, AFT = T, #Models
+                          CoxKP = T, KaplanMeier = T, RSFModel = T, AFTModel = T, #Models
                           DCal = T, OneCal = T, Concor = T, L1Measure = T, L2Measure = T, Brier = T, #Evaluations
                           OneCalTime = c(), BrierTime = c(), DCalBins = 10, LMeasure = "meanLinear", Ltype = "Hinge", Llog = F, #Evaluation args
                           numberBrierPoints = NULL, concordanceTies = "None", typeOneCal = "BucketKM", oneCalBuckets = 10, #Evaluation args
@@ -56,19 +56,28 @@ analysisMaster = function(survivalDataset, numberOfFolds,
   validatedData = validateAndClean(survivalDataset)
   normalizedData = createFoldsAndNormalize(validatedData, numberOfFolds)
   evaluationResults = data.frame()
+  combinedTestResults = list(Cox = list(), KM = list(), AFT = list(), RSF = list())
   for(i in 1:numberOfFolds){
     #Models - We evaluate values to NULL so we can pass them to evaluations, regardless if the models were ran or not.
     coxMod = NULL; kmMod = NULL; rsfMod = NULL; aftMod = NULL;
     training = normalizedData[[1]][[i]]
     testing = normalizedData[[2]][[i]]
-    if(CoxKP)
+    if(CoxKP){
       coxMod = CoxPH_KP(training, testing)
-    if(KaplanMeier)
+      combinedTestResults$Cox[[i]] = coxMod
+    }
+    if(KaplanMeier){
       kmMod = KM(training, testing)
-    if(RSF)
-      rsfMod = RSF(training, testing)
-    if(AFT)
+      combinedTestResults$KM[[i]] = kmMod
+    }
+    if(RSFModel){
+      rsfMod = RSF(training, testing,ntree = ntree)
+      combinedTestResults$RSF[[i]] = rsfMod
+    }
+    if(AFTModel){
       aftMod = AFT(training, testing, AFTDistribution)
+      combinedTestResults$AFT[[i]] = aftMod
+    }
     #Evaluations - Note that if evaluations are passed a NULL value they return a NULL.
     DCalResults = NULL;OneCalResults = NULL;ConcResults = NULL;BrierResults = NULL;L1Results = NULL; L2Results = NULL; 
     if(DCal){
@@ -97,10 +106,10 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     if(Brier){
       if(length(BrierTime)==0 | length(BrierTime) > 2)
         stop("Please enter a time (length 1 or 2) for the Brier score or change Brier to FALSE")
-      coxBrier = BrierScore(coxMod, BrierTime)
-      kmBrier = BrierScore(kmMod, BrierTime)
-      rsfBrier = BrierScore(rsfMod, BrierTime)
-      aftBrier = BrierScore(aftMod, BrierTime)
+      coxBrier = BrierScore(coxMod, BrierTime, numberBrierPoints)
+      kmBrier = BrierScore(kmMod, BrierTime, numberBrierPoints)
+      rsfBrier = BrierScore(rsfMod, BrierTime, numberBrierPoints)
+      aftBrier = BrierScore(aftMod, BrierTime, numberBrierPoints)
       BrierResults = rbind(coxBrier, kmBrier, rsfBrier, aftBrier)
     }
     if(L1Measure){
@@ -118,12 +127,28 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       L2Results = rbind(coxL2,kmL2,rsfL2,aftL2)
     }
     toAdd = as.data.frame(cbind(DCalResults, OneCalResults, ConcResults, BrierResults, L1Results, L2Results))
-    metricsRan = c(DCal,OneCal,Concordance, Brier,L1,L2)
+    metricsRan = c(DCal, OneCal, Concor, L1Measure, L2Measure, Brier)
     names(toAdd) = c("DCalibration","OneCalibration","Concordance","BrierResults", "L1Results","L2Results")[metricsRan]
-    toAdd = cbind.data.frame(FoldNumer = i, toAdd)
+    modelsRan = c(CoxKP, KaplanMeier, RSFModel, AFTModel)
+    models = c("CoxKP","Kaplan-Meier","RSF","AFT")[modelsRan]
+    toAdd = cbind.data.frame(Model = models,FoldNumer = i, toAdd)
     evaluationResults = rbind.data.frame(evaluationResults, toAdd)
   }
-  return(evaluationResults)
+  if(DCal){
+    coxCumDcal = DCalibrationCumulative(combinedTestResults$Cox,numBins = numBins)
+    kmCumDcal = DCalibrationCumulative(combinedTestResults$KM,numBins = numBins)
+    rsfCumDcal = DCalibrationCumulative(combinedTestResults$RSF,numBins = numBins)
+    aftCumDcal = DCalibrationCumulative(combinedTestResults$AFT,numBins = numBins)
+    DCalCumResults = c(coxCumDcal, kmCumDcal, rsfCumDcal, aftCumDcal)
+  }
+  if(OneCal){
+    coxCum1cal = OneCalibrationCumulative(combinedTestResults$Cox, OneCalTime, typeOneCal, oneCalBuckets)
+    kmCum1cal = OneCalibrationCumulative(combinedTestResults$KM, OneCalTime, typeOneCal, oneCalBuckets)
+    rsfCum1cal = OneCalibrationCumulative(combinedTestResults$RSF, OneCalTime, typeOneCal, oneCalBuckets)
+    aftCum1cal = OneCalibrationCumulative(combinedTestResults$AFT, OneCalTime, typeOneCal, oneCalBuckets)
+    OneCalCumResults = c(coxCum1cal, kmCum1cal, rsfCum1cal, aftCum1cal)
+  }
+  return(list(evaluationResults, DCalCumResults,OneCalCumResults) )
 }
 
 
