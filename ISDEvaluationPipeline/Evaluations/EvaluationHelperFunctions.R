@@ -62,7 +62,8 @@ predictMedianSurvivalTimeSpline = function(survivalCurve, predictedTimes){
 
 
 
-
+#Currently these functions are not being used but I have kept them here for the time being incase we ever want to use them as opposed
+#to the spline model.
 
 #We calculate the mean and median survival times assuming a stepwise function (the KM type curve)
 predictMeanSurvivalTimeKM = function(survivalCurve, predictedTimes){
