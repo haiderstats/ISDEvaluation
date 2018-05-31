@@ -29,6 +29,7 @@ AFT = function(training, testing, AFTDistribution){
   #the survival probabilties (sur) for any ID_SurvivalCurves against any column, e.g. the survival probabilities for ID_SurvivalCurves == 2,
   #correspond to the probabilites found in the second column of the matrix below.
   probabilityMatrix = matrix(probabilities, ncol = nrow(testing),byrow = T)
+  curvesToReturn = cbind.data.frame(time = timesToPredict, probabilityMatrix)
   timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
   return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))   
