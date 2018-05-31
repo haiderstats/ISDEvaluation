@@ -39,6 +39,35 @@ OneCalibration = function(survMod, timeOfInterest = NULL, type = "BucketKM", num
                               function(index) predictProbabilityFromCurve(survivalCurves[,index],
                                                                           predictedTimes,
                                                                           timeOfInterest)))
+  pval = binItUp(trueDeathTimes, censorStatus, predictions, type, numBuckets)
+  return(pval)
+}
+
+OneCalibrationCumulative = function(listOfSurvivalModels, timeOfInterest = NULL, type = "BucketKM", numBuckets = 10){
+  if(is.null(listOfSurvivalModels)) return(NULL)
+  if(!type %in% c("Uncensored","Fractional","BucketKM"))
+    stop("Please enter one of 'Uncensored','Fractional','BucketKM' for type.")
+  
+  predictedTimes = lapply(seq_along(listOfSurvivalModels), function(x) listOfSurvivalModels[[x]][[1]]$time)
+  survivalCurves = lapply(seq_along(listOfSurvivalModels), function(x) listOfSurvivalModels[[x]][[1]][-1])
+  trueDeathTimes = lapply(seq_along(listOfSurvivalModels), function(x) listOfSurvivalModels[[x]][[2]]$time)
+  censorStatus   = lapply(seq_along(listOfSurvivalModels), function(x) listOfSurvivalModels[[x]][[2]]$delta)
+  
+  #If time is null, we will select the median from the training instances (of those who were uncensored.)
+  if(is.null(timeOfInterest)){
+    allTimes = unlist(lapply(seq_along(listOfSurvivalModels), function(x) listOfSurvivalModels[[x]][[3]]$time))
+    timeOfInterest = median(allTimes)
+  }
+  predictions = unlist(lapply(seq_along(listOfSurvivalModels), function(model) lapply(seq_along(trueDeathTimes[[model]]),
+                              function(index) predictProbabilityFromCurve(survivalCurves[[model]][,index],
+                                                                          predictedTimes[[model]],
+                                                                          timeOfInterest))))
+  pval = binItUp(unlist(trueDeathTimes),unlist(censorStatus), predictions, type, numBuckets)
+  return(pval)
+}
+
+
+binItUp = function(trueDeathTimes,censorStatus, predictions, type, numBuckets){
   #We need to divide the number of predictions into as equal size buckets as possible. The formula for this can be found here:
   #https://math.stackexchange.com/questions/199690/divide-n-items-into-m-groups-with-as-near-equal-size-as-possible
   numberOfBucketsWithExtra = length(predictions) %% numBuckets
@@ -105,19 +134,17 @@ OneCalibration = function(survMod, timeOfInterest = NULL, type = "BucketKM", num
                     summarise(survivalPrediction = mean(prob))
                   numDied = timeFrame  %>%
                     group_by(label) %>%
-                    summarise(deadCount = 1 - predict(prodlim(Surv(time, delta)~1),timeOfInterest))
+                    summarise(deadCount = 1 - ifelse(is.na(predict(prodlim(Surv(time, delta)~1),timeOfInterest)),0,
+                                                     predict(prodlim(Surv(time, delta)~1),timeOfInterest)))
                   observed = numDied$deadCount
                   expected = 1-bucketSurvival$survivalPrediction
                   HLStat = sum((bucketSizes*(observed-expected)^2)/((1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction))
                   #See comments in file header for reasoning of degree of freedom choice.
                   DoF = ifelse(numBuckets > 15, numBuckets -2, numBuckets-1)
-                  pval = 1-pchisq(HLStat, DOF)
+                  pval = 1-pchisq(HLStat, DoF)
                 })
   return(pval)
 }
-
-
-
 
 
 
