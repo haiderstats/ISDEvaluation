@@ -23,8 +23,13 @@ predictProbabilityFromCurve = function(survivalCurve,predictedTimes, timeToPredi
   slope = differences[lastLinear]
   predictedProbabilities = rep(0, length(timeToPredict))
   linearChange = which(timeToPredict > maxTime)
-  predictedProbabilities[linearChange] = pmax(spline(maxTime) + (timeToPredict[linearChange] - maxTime)*slope,0)
-  predictedProbabilities[-linearChange] = spline(timeToPredict[-linearChange])
+  if(length(linearChange) > 0){
+    predictedProbabilities[linearChange] = pmax(spline(maxTime) + (timeToPredict[linearChange] - maxTime)*slope,0)
+    predictedProbabilities[-linearChange] = spline(timeToPredict[-linearChange])
+  }
+  else{
+    predictedProbabilities = spline(timeToPredict)
+  }
   return(predictedProbabilities)
 }
 
