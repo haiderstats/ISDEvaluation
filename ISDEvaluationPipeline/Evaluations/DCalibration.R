@@ -49,13 +49,18 @@ getBinned = function(survMod,numBins){
   uncensoredBinning = unlist(lapply(binIndex, function(x) length(which(uncensoredProbabilities >= quantiles[x] &
                                                                          uncensoredProbabilities < quantiles[x-1]))))
   censoredProbabilities = deathProbabilities[as.logical(1-censorStatus)]
-  censoredBinPositions = sindex(quantiles, censoredProbabilities)
-  percentToAdd = 1/((numBins - censoredBinPositions +1))
+  censoredBinPositions = sindex(quantiles,censoredProbabilities, comp = "greater", strict = T)
+  rawPercentToAdd = 1/((numBins - censoredBinPositions +1))
+  quantileWidth = 1/numBins
+  percentInBin = ifelse(censoredBinPositions == numBins,1,1 - (censoredProbabilities - quantiles[censoredBinPositions+1])/quantileWidth)
   #This is a list where each element is is a numBins length vector with 0s prior to the bin where the censored individual landed and 
   #a fraction that they contribute to each bin in all the following bins. This list is then composed into a matrix and columns are summed
   #to add the approprate contribution to each bin for the censored individuals.
+  firstBin = rawPercentToAdd*percentInBin
+  restOfBins = rawPercentToAdd + ifelse(rawPercentToAdd == 1,0,(rawPercentToAdd-firstBin)/(numBins - censoredBinPositions))
   listOfContributions = lapply(seq_along(censoredBinPositions),function(x) c(rep(0, censoredBinPositions[x] -1),
-                                                                             rep(percentToAdd[x], numBins - censoredBinPositions[x] +1)))
+                                                                             rep(firstBin[x],1),
+                                                                             rep(restOfBins[x], numBins - censoredBinPositions[x])))
   censoredBinning = colSums(ldply(listOfContributions,rbind))
   combinedBins = uncensoredBinning + censoredBinning
   return(combinedBins)
