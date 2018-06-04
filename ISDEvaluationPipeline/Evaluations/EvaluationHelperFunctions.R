@@ -14,13 +14,12 @@ library(prodlim)
 #the montotone spline using the Fritsch-Carlson method, see https://en.wikipedia.org/wiki/Monotone_cubic_interpolation. Also see 
 #help(splinefun), specifically for method = "monoH.FC". Note that we make an alteration to the method because if the last two time points
 #have the same probability (y value) then the spline is constant outside of the training data. We need this to be a decreasing function
-#outside the training data so instead we take the last linear fit from the model and apply it to the last time point.
+#outside the training data so instead we take the linear fit of (0,1) and the last time point we have (p,t*) and then apply this linear
+#function to all points outside of our fit.
 predictProbabilityFromCurve = function(survivalCurve,predictedTimes, timeToPredict){
   spline = splinefun(predictedTimes, survivalCurve, method = "monoH.FC")
   maxTime = max(predictedTimes)
-  differences = diff(spline(predictedTimes))
-  lastLinear = max(which(differences <0))
-  slope = differences[lastLinear]
+  slope = (1-spline(maxTime))/(predictedTimes[1] - max(predictedTimes))
   predictedProbabilities = rep(0, length(timeToPredict))
   linearChange = which(timeToPredict > maxTime)
   if(length(linearChange) > 0){
@@ -37,10 +36,8 @@ predictProbabilityFromCurve = function(survivalCurve,predictedTimes, timeToPredi
 predictMeanSurvivalTimeSpline = function(survivalCurve, predictedTimes){
   spline = splinefun(predictedTimes, survivalCurve, method = "monoH.FC")
   maxTime = max(predictedTimes)
-  differences = diff(spline(predictedTimes))
-  lastLinear = max(which(differences <0))
-  slope = differences[lastLinear]
-  zeroProbabilitiyTime = maxTime + -spline(maxTime)/slope
+  slope = (1-spline(maxTime))/(predictedTimes[1] - max(predictedTimes))
+  zeroProbabilitiyTime = maxTime + (0-spline(maxTime))/slope
   splineWithLinear = function(time) ifelse(time < maxTime, spline(time),spline(maxTime) + (time - maxTime)*slope)
   area = integrate(splineWithLinear,0, zeroProbabilitiyTime)[[1]]
   return(area)
@@ -57,9 +54,7 @@ predictMedianSurvivalTimeSpline = function(survivalCurve, predictedTimes){
     medianProbabilityTime = splineInv(0.5)
   }
   else{
-    differences = diff(spline(predictedTimes))
-    lastLinear = max(which(differences <0))
-    slope = differences[lastLinear]
+    slope = (1-spline(maxTime))/(predictedTimes[1] - max(predictedTimes))
     medianProbabilityTime = maxTime + (0.5-spline(maxTime))/slope
   }
   return(medianProbabilityTime)
