@@ -4,57 +4,74 @@
 #Email: hshaider@ualberta.ca
 
 #Purpose and General Comments:
-#This file was created to implement multiple L measures (L1, L2, L1 hinge etc.) as an evaluation metric for individual survival curves.
+#This file was created to implement multiple L measures (L1, L1 hinge, L1 margin) as an evaluation metric for individual survival curves.
 #Input 1: A list of (1) a matrix of survival curves, and (2) the true death times and event/censoring indicator (delta =1 implies death/event).
-#Output: The desired L-measure value.
+#Input 2: A string specifying the type of L1, options being "Uncensored","hinge", or "margin". 
+#Input 3: A boolean saying whether or not to use log scale, default is FALSE.
+#Output: The desired L1 measure value.
 ##############################################################################################################################################
 #Library Dependencies
-#We use this for the sindex function.
+#We need the Surv function from survival for the prodlim implementation of Kaplan Meier
+library(survival)
+#We use this for the prodlim function.
 library(prodlim)
 #We use this for ldply, a combiner of lists.
 library(plyr)
 #Helper Functions: predictMeanSurvivalTimeKM(survivalCurve,predictedTimes)
 source("Evaluations/EvaluationHelperFunctions.R")
 
-L1 = function(survMod, Lmeasure = "meanLinear", type = "Uncensored", logScale = F){
+L1 = function(survMod, type = "Uncensored", logScale = F){
   if(is.null(survMod)) return(NULL)
-  predictedTimes = survMod[[1]][,1]
+  predictedTimes = survMod[[1]]$time
   survivalCurves = survMod[[1]][-1]
-  trueDeathTimes = survMod[[2]][,1]
-  censorStatus = survMod[[2]][,2]
+  trueDeathTimes = survMod[[2]]$time
+  censorStatus = survMod[[2]]$delta
+  censorTimes = trueDeathTimes[as.logical(1-censorStatus)]
+  trainingDeathTimes = survMod[[3]]$time
+  trainingCensorStatus = survMod[[3]]$delta
   
-  averageMeasure = switch(Lmeasure,
-                          meanLinear = predictMeanSurvivalTimeLinear,
-                          meanKM = predictMeanSurvivalTimeKM,
-                          medianLinear = predictMedianSurvivalTimeLinear,
-                          medianKM = predictMedianSurvivalTimeKM)
   averageUncensored = unlist(lapply(which(as.logical(censorStatus)),
-                                    function(index) averageMeasure(survivalCurves[,index],
+                                    function(index) predictMeanSurvivalTimeSpline(survivalCurves[,index],
                                                                                   predictedTimes)))
+  averageCensored = unlist(lapply(which(as.logical(1-censorStatus)),
+                                  function(index) predictMeanSurvivalTimeSpline(survivalCurves[,index],
+                                                                                predictedTimes)))
+  
+  uncensoredPiece = ifelse(!logScale,
+                           sum(abs(trueDeathTimes[as.logical(censorStatus)] - averageUncensored)),
+                           sum(abs(log(trueDeathTimes[as.logical(censorStatus)]) - log(averageUncensored))))
   L1Measure = switch(type,
                      Uncensored = {
-                       L1Measure = ifelse(!logScale,
-                                          (1/(sum(censorStatus)))*sum(abs(trueDeathTimes[as.logical(censorStatus)] - averageUncensored)),
-                                          (1/(sum(censorStatus)))*sum(abs(log(trueDeathTimes[as.logical(censorStatus)]) - 
-                                                                            log(averageUncensored))))
+                       L1Measure = (1/sum(censorStatus))*uncensoredPiece
                      },
                      Hinge = {
-                       averageCensored = unlist(lapply(which(as.logical(1-censorStatus)),
-                                                       function(index) averageMeasure(survivalCurves[,index],
-                                                                                      predictedTimes)))
-                       hingePiece = trueDeathTimes[as.logical(1-censorStatus)] - averageCensored
+
+                       hingePiece = ifelse(!logScale,
+                                           censorTimes - averageCensored,
+                                           log(censorTimes) - log(averageCensored))
                        hingePieceCorrected = ifelse(hingePiece >=0, hingePiece,0)
-                       L1Measure = ifelse(!logScale,
-                                          (1/(length(censorStatus)))*(sum(abs(trueDeathTimes[as.logical(censorStatus)] - averageUncensored)) +
-                                                                        sum(hingePieceCorrected)),
-                                          (1/(length(censorStatus)))*(sum(abs(log(trueDeathTimes[as.logical(censorStatus)]) - 
-                                                                                log(averageUncensored))) +
-                                                                        sum(log(hingePieceCorrected[hingePieceCorrected!=0]))))
-                     },
+                       L1Measure = (1/(length(censorStatus)))*(uncensoredPiece + hingePieceCorrected)                     
+                    },
                      Margin = {
-                       
+                       KMCurve = prodlim(Surv(trainingDeathTimes, trainingCensorStatus)~1)
+                       KMPredict = function(time){
+                         prediction = predict(KMCurve,time)
+                         slope = (1-min(KMCurve$surv))/(0 - max(KMCurve$time))
+                         predictedProbabiliteis = ifelse(is.na(prediction), pmax(1+time*slope,0), prediction)
+                         return(predictedProbabiliteis)
+                       }
+                       bestGuess = unlist(lapply(censorTimes,
+                              function(time) time + integrate(KMPredict, lower = time, upper = Inf,subdivisions = 1000)[[1]]/KMPredict(time)))
+                       weights = cumsum(censorStatus[order(trueDeathTimes)])/sum(censorStatus)
+                       censorWeights = weights[as.logical(1-censorStatus[order(trueDeathTimes)])]
+                       marginPiece = ifelse(!logScale,
+                                            sum(censorWeights*(abs(bestGuess[order(censorTimes)] - averageCensored[order(censorTimes)]))),
+                                            sum(censorWeights*(abs(log(bestGuess[order(censorTimes)])-log(averageCensored[order(censorTimes)]))))
+                       )
+                       L1Measure = (1/length(censorStatus))*(uncensoredPiece + marginPiece)
                      }
   )
+  return(L1Measure)
 }
 
 
