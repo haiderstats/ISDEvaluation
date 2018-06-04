@@ -1,4 +1,4 @@
-#File Name: DCalibration.R
+#File Name: L1Measures.R
 #Date Created: May 29th, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
@@ -50,51 +50,12 @@ L1 = function(survMod, Lmeasure = "meanLinear", type = "Uncensored", logScale = 
                                           (1/(length(censorStatus)))*(sum(abs(log(trueDeathTimes[as.logical(censorStatus)]) - 
                                                                                 log(averageUncensored))) +
                                                                         sum(log(hingePieceCorrected[hingePieceCorrected!=0]))))
-                     }
-  )
-}
-
-
-L2 = function(survMod, Lmeasure = "meanLinear", type = "Uncensored", logScale = F){
-  predictedTimes = survMod[[1]][,1]
-  survivalCurves = survMod[[1]][-1]
-  trueDeathTimes = survMod[[2]][,1]
-  censorStatus = survMod[[2]][,2]
-  
-  averageMeasure = switch(Lmeasure,
-                          meanLinear = predictMeanSurvivalTimeLinear,
-                          meanKM = predictMeanSurvivalTimeKM,
-                          medianLinear = predictMedianSurvivalTimeLinear,
-                          medianKM = predictMedianSurvivalTimeKM)
-  averageUncensored = unlist(lapply(which(as.logical(censorStatus)),
-                                    function(index) averageMeasure(survivalCurves[,index],
-                                                                   predictedTimes)))
-  L2Measure = switch(type,
-                     Uncensored = {
-                       L2Measure = ifelse(!logScale,
-                                          (1/(sum(censorStatus)))*sum((trueDeathTimes[as.logical(censorStatus)] - averageUncensored)^2),
-                                          (1/(sum(censorStatus)))*sum((log(trueDeathTimes[as.logical(censorStatus)]) -
-                                                                         log(averageUncensored))^2))
                      },
-                     Hinge = {
+                     Margin = {
                        
-                       averageCensored = unlist(lapply(which(as.logical(1-censorStatus)),
-                                                       function(index) averageMeasure(survivalCurves[,index],
-                                                                                      predictedTimes)))
-                       hingePiece = trueDeathTimes[as.logical(1-censorStatus)] - averageCensored
-                       hingePieceCorrected = ifelse(hingePiece >=0, hingePiece,0)
-                       L2Measure = ifelse(!logScale,
-                                          (1/(length(censorStatus)))*(sum((trueDeathTimes[as.logical(censorStatus)] - averageUncensored)^2) +
-                                                                        sum(hingePieceCorrected)),
-                                          (1/(length(censorStatus)))*(sum((log(trueDeathTimes[as.logical(censorStatus)]) -
-                                                                             log(averageUncensored))^2) +
-                                                                        sum(log(hingePieceCorrected[hingePieceCorrected!=0])))
-                       )
                      }
   )
-    return(L2Measure)
 }
-
 
 
 
