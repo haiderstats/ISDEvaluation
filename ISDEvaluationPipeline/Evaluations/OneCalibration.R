@@ -32,9 +32,21 @@ OneCalibration = function(survMod, timeOfInterest = NULL, type = "BucketKM", num
   survivalCurves = survMod[[1]][-1] #removes predicted times.
   trueDeathTimes = survMod[[2]]$time
   censorStatus = survMod[[2]]$delta
-  #If time is null, we will select the median from the training instances (of those who were uncensored.)
-  if(is.null(timeOfInterest))
-    timeOfInterest = median(survMod[[3]][survMod[[3]]$delta]$time)
+  trainingDeathTimes = survMod[[3]]$time
+  trainingCensorStatus = survMod[[3]]$delta
+  #If time is null, we will select the median from the KM curve generated from training instances.
+  if(is.null(timeOfInterest)){
+    KMCurve = prodlim(Surv(trainingDeathTimes, trainingCensorStatus)~1)
+    timeOfInterest = tryCatch({
+      quantile(KMCurve,.5)$quantiles.survival$quantile
+    },
+    #Catch the case where there is too many censored patients to generate a KM Curve. In this case we use our linear extension to find the 
+    #Median.
+    error = function(e){
+      slope = (1-min(KMCurve$surv))/(0 - max(KMCurve$time))
+      timeOfInterest = (-0.5)/slope
+    })
+  }
   predictions = unlist(lapply(seq_along(trueDeathTimes),
                               function(index) predictProbabilityFromCurve(survivalCurves[,index],
                                                                           predictedTimes,
@@ -52,11 +64,20 @@ OneCalibrationCumulative = function(listOfSurvivalModels, timeOfInterest = NULL,
   survivalCurves = lapply(seq_along(listOfSurvivalModels), function(x) listOfSurvivalModels[[x]][[1]][-1])
   trueDeathTimes = lapply(seq_along(listOfSurvivalModels), function(x) listOfSurvivalModels[[x]][[2]]$time)
   censorStatus   = lapply(seq_along(listOfSurvivalModels), function(x) listOfSurvivalModels[[x]][[2]]$delta)
-  
   #If time is null, we will select the median from the training instances (of those who were uncensored.)
   if(is.null(timeOfInterest)){
-    allTimes = unlist(lapply(seq_along(listOfSurvivalModels), function(x) listOfSurvivalModels[[x]][[3]]$time))
-    timeOfInterest = median(allTimes)
+    allTimes = unlist(trueDeathTimes)
+    allCensorStatus = unlist(censorStatus)
+    KMCurve = prodlim(Surv(allTimes, allCensorStatus)~1)
+    timeOfInterest = tryCatch({
+      quantile(KMCurve,.5)$quantiles.survival$quantile
+    },
+    #Catch the case where there is too many censored patients to generate a KM Curve. In this case we use our linear extension to find the 
+    #Median.
+    error = function(e){
+      slope = (1-min(KMCurve$surv))/(0 - max(KMCurve$time))
+      timeOfInterest = (-0.5)/slope
+    })
   }
   predictions = unlist(lapply(seq_along(listOfSurvivalModels), function(model) lapply(seq_along(trueDeathTimes[[model]]),
                               function(index) predictProbabilityFromCurve(survivalCurves[[model]][,index],
@@ -134,7 +155,8 @@ binItUp = function(trueDeathTimes,censorStatus, predictions, type, numBuckets){
                     summarise(survivalPrediction = mean(prob))
                   numDied = timeFrame  %>%
                     group_by(label) %>%
-                    summarise(deadCount = 1 - ifelse(is.na(predict(prodlim(Surv(time, delta)~1),timeOfInterest)),0,
+                    mutate(slope = (1-min(prodlim(Surv(time, delta)~1)$surv))/(0-max(time))) %>%
+                    summarise(deadCount = 1-ifelse(is.na(predict(prodlim(Surv(time, delta)~1),timeOfInterest)),max(0,1+slope*timeOfInterest),
                                                      predict(prodlim(Surv(time, delta)~1),timeOfInterest)))
                   observed = numDied$deadCount
                   expected = 1-bucketSurvival$survivalPrediction
