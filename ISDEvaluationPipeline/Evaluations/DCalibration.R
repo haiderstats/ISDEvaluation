@@ -33,7 +33,7 @@ DCalibrationCumulative = function(listOfSurvivalModels, numBins){
 }
 
 
-getBinned = function(survMod,numBins){
+getBinned = function(survMod,numBins, weighted = F){
   predictedTimes = survMod[[1]][,1]
   survivalCurves = survMod[[1]][-1]
   trueDeathTimes = survMod[[2]]$time
@@ -50,14 +50,24 @@ getBinned = function(survMod,numBins){
                                                                          uncensoredProbabilities < quantiles[x-1]))))
   censoredProbabilities = deathProbabilities[as.logical(1-censorStatus)]
   censoredBinPositions = sindex(quantiles,censoredProbabilities, comp = "greater", strict = T)
-  rawPercentToAdd = 1/((numBins - censoredBinPositions +1))
+  orderCensor = survMod[[3]]$delta[order(survMod[[3]]$time)]
+  weights = cumsum(orderCensor)/sum(orderCensor)
+  weightIndex = sindex(survMod[[3]]$time, trueDeathTimes[as.logical(1-censorStatus)])
+  censorWeights = weights[weightIndex]
+  if(weighted){
+    rawPercentToAdd = (1/((numBins - censoredBinPositions +1)))*censorWeights
+  }
+  else{
+    rawPercentToAdd = (1/((numBins - censoredBinPositions +1)))
+  }
   quantileWidth = 1/numBins
   percentInBin = ifelse(censoredBinPositions == numBins,1,1 - (censoredProbabilities - quantiles[censoredBinPositions+1])/quantileWidth)
   #This is a list where each element is is a numBins length vector with 0s prior to the bin where the censored individual landed and 
   #a fraction that they contribute to each bin in all the following bins. This list is then composed into a matrix and columns are summed
   #to add the approprate contribution to each bin for the censored individuals.
-  firstBin = rawPercentToAdd*percentInBin
-  restOfBins = rawPercentToAdd + ifelse(rawPercentToAdd == 1,0,(rawPercentToAdd-firstBin)/(numBins - censoredBinPositions))
+  firstBin = ifelse(censoredBinPositions == numBins,1,(censoredProbabilities - quantiles[censoredBinPositions+1])/censoredProbabilities)
+  restOfBins = ifelse(censoredProbabilities ==0,1,(1/numBins)/cenProb)
+
   listOfContributions = lapply(seq_along(censoredBinPositions),function(x) c(rep(0, censoredBinPositions[x] -1),
                                                                              rep(firstBin[x],1),
                                                                              rep(restOfBins[x], numBins - censoredBinPositions[x])))
