@@ -19,11 +19,11 @@ library(prodlim)
 predictProbabilityFromCurve = function(survivalCurve,predictedTimes, timeToPredict){
   spline = splinefun(predictedTimes, survivalCurve, method = "monoH.FC")
   maxTime = max(predictedTimes)
-  slope = (1-spline(maxTime))/(predictedTimes[1] - max(predictedTimes))
+  slope = (1-spline(maxTime))/(0 - max(predictedTimes))
   predictedProbabilities = rep(0, length(timeToPredict))
   linearChange = which(timeToPredict > maxTime)
   if(length(linearChange) > 0){
-    predictedProbabilities[linearChange] = pmax(spline(maxTime) + (timeToPredict[linearChange] - maxTime)*slope,0)
+    predictedProbabilities[linearChange] = pmax(1 + timeToPredict[linearChange]*slope,0)
     predictedProbabilities[-linearChange] = spline(timeToPredict[-linearChange])
   }
   else{
@@ -36,9 +36,9 @@ predictProbabilityFromCurve = function(survivalCurve,predictedTimes, timeToPredi
 predictMeanSurvivalTimeSpline = function(survivalCurve, predictedTimes){
   spline = splinefun(predictedTimes, survivalCurve, method = "monoH.FC")
   maxTime = max(predictedTimes)
-  slope = (1-spline(maxTime))/(predictedTimes[1] - max(predictedTimes))
+  slope = (1-spline(maxTime))/(0 - max(predictedTimes))
   zeroProbabilitiyTime = maxTime + (0-spline(maxTime))/slope
-  splineWithLinear = function(time) ifelse(time < maxTime, spline(time),spline(maxTime) + (time - maxTime)*slope)
+  splineWithLinear = function(time) ifelse(time < maxTime, spline(time),1 + time*slope)
   area = integrate(splineWithLinear,0, zeroProbabilitiyTime)[[1]]
   return(area)
 }
@@ -54,7 +54,7 @@ predictMedianSurvivalTimeSpline = function(survivalCurve, predictedTimes){
     medianProbabilityTime = splineInv(0.5)
   }
   else{
-    slope = (1-spline(maxTime))/(predictedTimes[1] - max(predictedTimes))
+    slope = (1-spline(maxTime))/(0 - max(predictedTimes))
     medianProbabilityTime = maxTime + (0.5-spline(maxTime))/slope
   }
   return(medianProbabilityTime)
