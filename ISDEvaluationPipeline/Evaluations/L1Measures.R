@@ -17,7 +17,7 @@ library(survival)
 library(prodlim)
 #We use this for ldply, a combiner of lists.
 library(plyr)
-#Helper Functions: predictMeanSurvivalTimeKM(survivalCurve,predictedTimes)
+#Helper Functions: predictMeanSurvivalTimeSpline(survivalCurve,predictedTimes)
 source("Evaluations/EvaluationHelperFunctions.R")
 
 L1 = function(survMod, type = "Uncensored", logScale = F){
@@ -54,14 +54,15 @@ L1 = function(survMod, type = "Uncensored", logScale = F){
                     },
                      Margin = {
                        KMCurve = prodlim(Surv(trainingDeathTimes, trainingCensorStatus)~1)
-                       KMPredict = function(time){
+                       KMLinearPredict = function(time){
                          prediction = predict(KMCurve,time)
                          slope = (1-min(KMCurve$surv))/(0 - max(KMCurve$time))
                          predictedProbabiliteis = ifelse(is.na(prediction), pmax(1+time*slope,0), prediction)
                          return(predictedProbabiliteis)
                        }
                        bestGuess = unlist(lapply(censorTimes,
-                              function(time) time + integrate(KMPredict, lower = time, upper = Inf,subdivisions = 1000)[[1]]/KMPredict(time)))
+                              function(time) time + integrate(KMLinearPredict,
+                                                              lower = time, upper = Inf,subdivisions = 1000)[[1]]/KMLinearPredict(time)))
                        weights = cumsum(censorStatus[order(trueDeathTimes)])/sum(censorStatus)
                        censorWeights = weights[as.logical(1-censorStatus[order(trueDeathTimes)])]
                        marginPiece = ifelse(!logScale,
