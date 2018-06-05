@@ -7,9 +7,10 @@
 #This file was created to implement a single time and integrated time Brier score. The integrated Brier Score is evaluted numerically 
 #two different ways. One option is to use the time points at the event times in the testing data. This option would correspond to 
 #basedOnEvents =T. In this case, the function integratedBrier() is used. In this event, numerical integration is doen using the trapezoid rule(
-#see: https://en.wikipedia.org/wiki/Trapezoidal_rule). #The other option is to simply use the built in integrate() function
-#which is an implementation of a numerical integration technique. This evaluates enough points in the interval to produce a numerical integral
-#with low error. This function uses the singleBrierMultiplePoints() function. If only one point is evaluated the singleBrier() function is used.
+#see: https://en.wikipedia.org/wiki/Trapezoidal_rule). This is what is does when calling the sbrier function. 
+#The other option is to simply use the built in integrate() function which is an implementation of a numerical integration technique. 
+#This evaluates enough points in the interval to produce a numerical integral with low error. 
+#This function uses the singleBrierMultiplePoints() function. If only one point is evaluated the singleBrier() function is used.
 #Ideally, singleBrier and singleBrierMultiplePoints would be built into one function but this has not been done yet. 
 
 #Input 1: A list of (1) a matrix of survival curves, and (2) the true death times and event/censoring indicator (delta =1 implies death/event)
@@ -30,7 +31,7 @@ BrierScore = function(survMod, BrierTime, basedOnEvents=F){
   if(is.null(survMod)) return(NULL)
   score = ifelse(length(BrierTime) ==1,
                  singleBrier(survMod, BrierTime),
-                 ifelse(basedOnEvents,integratedBrier(survMod, BrierTime, numberBrierPoints),
+                 ifelse(basedOnEvents,integratedBrier(survMod, BrierTime),
                         integrate(singleBrierMultiplePoints, lower= BrierTime[1],upper= BrierTime[2],survMod=survMod,
                                   subdivisions = 1000)[[1]]/diff(BrierTime)))
   return(score)
@@ -39,8 +40,10 @@ BrierScore = function(survMod, BrierTime, basedOnEvents=F){
 singleBrier = function(survMod, BrierTime){
   eventTimes = survMod[[2]]$time
   censorStatus = survMod[[2]]$delta
-  inverseCensor = 1-censorStatus
-  invProbCensor = prodlim(Surv(eventTimes,inverseCensor)~1)
+  trainingEventTimes = survMod[[3]]$time
+  trainingCensorStatus = survMod[[3]]$delta
+  inverseCensorTrain = 1 - trainingCensorStatus
+  invProbCensor = prodlim(Surv(trainingEventTimes,inverseCensorTrain)~1)
   #Here we are ordering event times and then using predict with level.chaos = 1 which returns predictions ordered by time.
   orderOfTimes = order(eventTimes)
   #Category one is individuals with event time lower than the time of interest and were NOT censored.
@@ -66,8 +69,10 @@ singleBrier = function(survMod, BrierTime){
 singleBrierMultiplePoints = function(survMod, BrierTimes){
   eventTimes = survMod[[2]]$time
   censorStatus = survMod[[2]]$delta
-  inverseCensor = 1-censorStatus
-  invProbCensor = prodlim(Surv(eventTimes,inverseCensor)~1)
+  trainingEventTimes = survMod[[3]]$time
+  trainingCensorStatus = survMod[[3]]$delta
+  inverseCensorTrain = 1 - trainingCensorStatus
+  invProbCensor = prodlim(Surv(trainingEventTimes,inverseCensorTrain)~1)
   orderOfTimes = order(eventTimes)
 
   bsPointsMat = matrix(rep(BrierTimes, length(eventTimes)), nrow = length(eventTimes),byrow = T)
@@ -91,8 +96,10 @@ singleBrierMultiplePoints = function(survMod, BrierTimes){
 integratedBrier = function(survMod, BrierTime){
   eventTimes = survMod[[2]]$time
   censorStatus = survMod[[2]]$delta
-  inverseCensor = 1-censorStatus
-  invProbCensor = prodlim(Surv(eventTimes,inverseCensor)~1)
+  trainingEventTimes = survMod[[3]]$time
+  trainingCensorStatus = survMod[[3]]$delta
+  inverseCensorTrain = 1 - trainingCensorStatus
+  invProbCensor = prodlim(Surv(trainingEventTimes,inverseCensorTrain)~1)
   orderOfTimes = order(eventTimes)
   sortedEvents = sort(eventTimes)
   points = sortedEvents[sortedEvents >= BrierTime[1] & sortedEvents <=BrierTime[2]]
