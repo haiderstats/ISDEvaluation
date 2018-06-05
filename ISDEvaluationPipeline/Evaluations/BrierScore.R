@@ -16,18 +16,20 @@
 #For example, if the death times of the test cases were 5, 10, 42, and 100 and the time passed in was c(6, 75) then only 2 time points
 #would be used, namely, 10 and 42. 
 #Output: The desired type of Brier Score.
-############################################################################################################################################
+###############################################################################################################################################
 #Library dependencies:
 #prodlim gives a faster KM implementation and also gives a predict function for KM
 library(prodlim)
 #Helper functions:
 source("Evaluations/EvaluationHelperFunctions.R")
 
-BrierScore = function(survMod, BrierTime, numberBrierPoints = NULL){
+BrierScore = function(survMod, BrierTime, basedOnEvents=F){
   if(is.null(survMod)) return(NULL)
   score = ifelse(length(BrierTime) ==1,
                  singleBrier(survMod, BrierTime),
-                 integratedBrier(survMod, BrierTime, numberBrierPoints))
+                 ifelse(basedOnEvents,integratedBrier(survMod, BrierTime, numberBrierPoints),
+                        integrate(singleBrierMultiplePoints, lower= BrierTime[1],upper= BrierTime[2],survMod=survMod,
+                                  subdivisions = 1000)[[1]]/diff(BrierTime)))
   return(score)
 }
 
@@ -50,29 +52,47 @@ singleBrier = function(survMod, BrierTime){
   weightCat2[is.na(weightCat2)] = 0
   
   predictedTimes = survMod[[1]][,1]
-  #Take the survival curves, remove the times column, and then order the curves by the order in which they died. We have to order them to line up
-  #with the weight vectors.
+  #Take the survival curves, remove the times column, and then order the curves by the order in which they died. We have to order them to 
+  #line up with the weight vectors.
   survivalCurvesOrdered = survMod[[1]][,-1][orderOfTimes]
   predictions = apply(survivalCurvesOrdered,2, function(z) predictProbabilityFromCurve(z,predictedTimes,BrierTime))
   bScore = mean(predictions^2*weightCat1 + (1-predictions)^2*weightCat2)
   return(bScore)
 }
 
-
-#integrated Brier Score based on the single time point brier score, found above.
-integratedBrier = function(survMod, BrierTime, numPoints = NULL){
+singleBrierMultiplePoints = function(survMod, BrierTimes){
   eventTimes = survMod[[2]]$time
   censorStatus = survMod[[2]]$delta
   inverseCensor = 1-censorStatus
   invProbCensor = prodlim(Surv(eventTimes,inverseCensor)~1)
   orderOfTimes = order(eventTimes)
-  if(is.null(numPoints)){
-    sortedEvents = sort(eventTimes)
-    points = sortedEvents[sortedEvents >= BrierTime[1] & sortedEvents <=BrierTime[2]]
-  }
-  else{
-    points = seq(BrierTime[1], BrierTime[2], length.out = numPoints)
-  } 
+
+  bsPointsMat = matrix(rep(BrierTimes, length(eventTimes)), nrow = length(eventTimes),byrow = T)
+  
+  #Each column represents the indicator for a single brier score 
+  weightCat1Mat = (eventTimes[orderOfTimes] <= bsPointsMat & censorStatus[orderOfTimes])*predict(invProbCensor, eventTimes, level.chaos = 1)
+  weightCat2Mat = (eventTimes[orderOfTimes] > bsPointsMat)%*%diag(predict(invProbCensor, BrierTimes,level.chaos = 2))
+  #Catch if BrierTimes goes over max event time, i.e. predict gives NA
+  weightCat2Mat[is.na(weightCat2Mat)] = 0
+  
+  predictedTimes = survMod[[1]][,1]
+  #Take the survival curves, remove the times column, and then order the curves by the order in which they died. We have to order them to
+  #line up with the weight matricies.
+  survivalCurvesOrdered = survMod[[1]][,-1][orderOfTimes]
+  predictions = t(apply(survivalCurvesOrdered,2, function(curve) predictProbabilityFromCurve(curve,predictedTimes,BrierTimes)))
+  bscores = apply(predictions^2*weightCat1Mat + (1-predictions)^2*weightCat2Mat, 2, mean)
+  return(bscores)
+}
+
+#integrated Brier Score based on the single time point brier score, found above.
+integratedBrier = function(survMod, BrierTime){
+  eventTimes = survMod[[2]]$time
+  censorStatus = survMod[[2]]$delta
+  inverseCensor = 1-censorStatus
+  invProbCensor = prodlim(Surv(eventTimes,inverseCensor)~1)
+  orderOfTimes = order(eventTimes)
+  sortedEvents = sort(eventTimes)
+  points = sortedEvents[sortedEvents >= BrierTime[1] & sortedEvents <=BrierTime[2]]
   bsPointsMat = matrix(rep(points, length(eventTimes)), nrow = length(eventTimes),byrow = T)
   
   #Each column represents the indicator for a single brier score 
@@ -89,12 +109,7 @@ integratedBrier = function(survMod, BrierTime, numPoints = NULL){
   bscores = apply(predictions^2*weightCat1Mat + (1-predictions)^2*weightCat2Mat, 2, mean)
   indexs = 2:length(points)
   trapezoidIntegralVal = diff(points) %*% ((bscores[indexs - 1] + bscores[indexs])/2)
-  if(is.null(numPoints)){
-    intBScore = trapezoidIntegralVal/diff(range(points))
-  }
-  else{
-    intBScore = trapezoidIntegralVal/(BrierTime[2] - BrierTime[1])
-  }
+  intBScore = trapezoidIntegralVal/diff(range(points))
   return(intBScore)
 }
 
