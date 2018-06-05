@@ -5,17 +5,20 @@
 
 #Purpose and General Comments:
 #This file was created to implement a single time and integrated time Brier score. The integrated Brier Score is evaluted numerically 
-#by taking brier scores at a number of time points and then integrating across different time points by taking the trapezoidal 
-#approximation (see: https://en.wikipedia.org/wiki/Trapezoidal_rule).
+#two different ways. One option is to use the time points at the event times in the testing data. This option would correspond to 
+#basedOnEvents =T. In this case, the function integratedBrier() is used. In this event, numerical integration is doen using the trapezoid rule(
+#see: https://en.wikipedia.org/wiki/Trapezoidal_rule). #The other option is to simply use the built in integrate() function
+#which is an implementation of a numerical integration technique. This evaluates enough points in the interval to produce a numerical integral
+#with low error. This function uses the singleBrierMultiplePoints() function. If only one point is evaluated the singleBrier() function is used.
+#Ideally, singleBrier and singleBrierMultiplePoints would be built into one function but this has not been done yet. 
 
-#Input 1: A list of (1) a matrix of survival curves, and (2) the true death times and event/censoring indicator (delta =1 implies death/event).
+#Input 1: A list of (1) a matrix of survival curves, and (2) the true death times and event/censoring indicator (delta =1 implies death/event)
+#of the TESTING data, and (3) the true death times and event/censoring indicator (delta =1 implies death/event) of the TRAINING data.
 #Input 2: The time for the Brier score to be evaluated. Either a vector of length 2 e.g. c(0,100) or a single numeric value, e.g. 42.
-#Input 3: The number of points to be used for the integrated Brier Score. In the event that nothing is passed in for the number of points
-#AND the time is a vector of length two, the time points will be only those event times which occured between the first and second 
-#time point. 
-#For example, if the death times of the test cases were 5, 10, 42, and 100 and the time passed in was c(6, 75) then only 2 time points
-#would be used, namely, 10 and 42. 
-#Output: The desired type of Brier Score.
+#Input 3: A boolean indicating if integration should be done using the event times of the testing data or if we should integrate over all
+#possible time points in the vector. In the first case an example is if the death times of the test cases were 5, 10, 42, and 100 and the time
+#passed in was c(6, 75) then only 2 time points would be used, namely, 10 and 42. In the second case we numerically integrate over c(6,75).
+#Output: The desired type of Brier Score (single or integrated).
 ###############################################################################################################################################
 #Library dependencies:
 #prodlim gives a faster KM implementation and also gives a predict function for KM
