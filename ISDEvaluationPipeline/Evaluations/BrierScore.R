@@ -52,6 +52,8 @@ singleBrier = function(survMod, BrierTime){
   weightCat1 = (eventTimes[orderOfTimes] <= BrierTime & censorStatus[orderOfTimes])*predict(invProbCensor,
                                                                                             eventTimes,
                                                                                             level.chaos = 1)
+  #Catch if event times goes over max training event time, i.e. predict gives NA
+  weightCat1[is.na(weightCat1)] = 0
   #Category 2 is individuals whose time was greater than the time of interest (BrierTime) - both censored and uncensored individuals.
   weightCat2 = (eventTimes[orderOfTimes] > BrierTime)*predict(invProbCensor,
                                                               BrierTime,
@@ -81,6 +83,9 @@ singleBrierMultiplePoints = function(survMod, BrierTimes){
   
   #Each column represents the indicator for a single brier score 
   weightCat1Mat = (eventTimes[orderOfTimes] <= bsPointsMat & censorStatus[orderOfTimes])*predict(invProbCensor, eventTimes, level.chaos = 1)
+  #Catch if event times goes over max training event time, i.e. predict gives NA
+  weightCat1Mat[is.na(weightCat1Mat)] = 0
+
   weightCat2Mat = (eventTimes[orderOfTimes] > bsPointsMat)%*%diag(predict(invProbCensor, BrierTimes,level.chaos = 2))
   #Catch if BrierTimes goes over max event time, i.e. predict gives NA
   weightCat2Mat[is.na(weightCat2Mat)] = 0
@@ -109,6 +114,9 @@ integratedBrier = function(survMod, BrierTime){
   
   #Each column represents the indicator for a single brier score 
   weightCat1Mat = (eventTimes[orderOfTimes] <= bsPointsMat & censorStatus[orderOfTimes])*predict(invProbCensor, eventTimes, level.chaos = 1)
+  #Catch if event times goes over max training event time, i.e. predict gives NA
+  weightCat1Mat[is.na(weightCat1Mat)] = 0
+  
   weightCat2Mat = (eventTimes[orderOfTimes] > bsPointsMat)*predict(invProbCensor, points,level.chaos = 1)
   #Catch if points goes over max event time, i.e. predict gives NA
   weightCat2Mat[is.na(weightCat2Mat)] = 0
