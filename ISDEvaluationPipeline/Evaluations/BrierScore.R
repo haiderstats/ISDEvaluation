@@ -35,7 +35,7 @@ BrierScore = function(survMod, BrierTime = NULL, basedOnEvents=F){
                  singleBrier(survMod, BrierTime),
                  ifelse(basedOnEvents,integratedBrier(survMod, BrierTime),
                         integrate(singleBrierMultiplePoints, lower= BrierTime[1],upper= BrierTime[2],survMod=survMod,
-                                  subdivisions = 300)[[1]]/diff(BrierTime)))
+                                  subdivisions = 700)[[1]]/diff(BrierTime)))
   return(score)
 }
 
