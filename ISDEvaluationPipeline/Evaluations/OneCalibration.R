@@ -16,6 +16,8 @@
 #Output: The desired L-measure value.
 ##############################################################################################################################################
 #Library Dependencies
+#We use this for the Surv function.
+library(survival)
 #We use this for the sindex function.
 library(prodlim)
 #We use this for group_by, summarise, and mutate.
@@ -147,7 +149,7 @@ binItUp = function(trueDeathTimes,censorStatus, predictions, type, numBuckets){
                   HLStat = sum((observed-expected)^2/(bucketSizes*(1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction))
                   pval = 1-pchisq(HLStat, numBuckets-2)
                 },
-                #For a good discusion of this method, also known as the D'Agnostio-Nam tranlation/method see
+                #For a good discusion of this method, also known as the D'Agostino-Nam tranlation/method see
                 #Section 2.2 of this thesis paper: Hosmer-Lemeshow goodness-of-fit test: Translations to the Cox Proportional Hazards Model
                 BucketKM = {
                   bucketSurvival = orderedPredictionFrame  %>%
