@@ -62,24 +62,26 @@ Concordance = function(survMod, ties = "None",includeCensored =F){
     orderDeathTimes = order(trueDeathTimes)
     sortedDeathTimes = sort(trueDeathTimes)
     #Each row of the following matrix represents a single individual. Each column is the (ith +1) individual in the testing data.
-    #A value of 1 in the ith row and jth column means that the ith individual (sorted by event time/censored time) is censored 
-    #and has a smaller event time than the jth +1 individual and the jth + 1 individual is censored.
-    trueCensMatrix = ldply(lapply(seq_along(sortedDeathTimes), function(x) as.numeric(sortedDeathTimes[x] <= sortedDeathTimes[-x]  &
-                                                                                        !censorStatus[orderDeathTimes][x] &
-                                                                                        !censorStatus[orderDeathTimes][-x])),rbind)
+    #A value of 1 in the ith row and jth column means that the ith individual (sorted by event time/censored time) is censored and
+    #has a smaller event time than the jth +1 individual. Note that we ignore ties by using sortedDeathTimes[x] < sortedDeathTimes[-x]
+    #as opposed to sortedDeathTimes[x] <= sortedDeathTimes[-x].
+    
+    trueCensMatrix = ldply(lapply(seq_along(sortedDeathTimes), function(x) as.numeric(sortedDeathTimes[x] < sortedDeathTimes[-x]  &
+                                                                                        !censorStatus[orderDeathTimes][x])),rbind)
     
     rowIndex = 0
     estimatedCensMatrix = apply(trueCensMatrix,1,function(x){
       rowIndex <<- rowIndex+1
       #Need to add 1 since there are number of individuals -1 columns.
-      censored = which(x == 1) +1
-      if(length(censored)>0){
-        s2 = KMLinearPredict(sortedDeathTimes[censored])
-        s1 = rep(KMLinearPredict(sortedDeathTimes[rowIndex]), length(censored))
-        greaterProb = 1 - 0.5*(s2/s1)
-        predictedProb = ifelse(averageSurvivalTimes[orderDeathTimes][rowIndex] <= averageSurvivalTimes[orderDeathTimes][censored],
+      toCompare = which(x == 1) +1
+      uncensoredInd = as.logical(censorStatus[orderDeathTimes][toCompare])
+      if(length(toCompare)>0){
+        s2 = KMLinearPredict(sortedDeathTimes[toCompare])
+        s1 = rep(KMLinearPredict(sortedDeathTimes[rowIndex]), length(toCompare))
+        greaterProb = ifelse(uncensoredInd,1-(s2/s1),1 - 0.5*(s2/s1))
+        predictedProb = ifelse(averageSurvivalTimes[orderDeathTimes][rowIndex] <= averageSurvivalTimes[orderDeathTimes][toCompare],
                                greaterProb,1-greaterProb)
-        x[censored-1] = predictedProb
+        x[toCompare-1] = predictedProb
       }
       return(x)
     })
