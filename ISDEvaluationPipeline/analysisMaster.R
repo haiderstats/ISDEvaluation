@@ -46,6 +46,14 @@ survivalDataset$sex = factor(survivalDataset$sex,levels = c(1,2), labels= c("Mal
 survivalDataset[1:5, 4] = NA
 
 
+colonSurv = colon[2:15]
+names(colonSurv)[8] = "delta"
+colonSurv$sex = as.factor(colonSurv$sex)
+colonSurv$obstruct = as.factor(colonSurv$obstruct)
+colonSurv$perfor = as.factor(colonSurv$perfor)
+colonSurv$adhere = as.factor(colonSurv$adhere)
+colonSurv$surg = as.factor(colonSurv$surg)
+
 analysisMaster = function(survivalDataset, numberOfFolds,
                           CoxKP = T, KaplanMeier = T, RSFModel = T, AFTModel = T, #Models
                           DCal = T, OneCal = T, Concor = T, L1Measure = T, Brier = T, #Evaluations
@@ -60,10 +68,12 @@ analysisMaster = function(survivalDataset, numberOfFolds,
   evaluationResults = data.frame()
   combinedTestResults = list(Cox = list(), KM = list(), AFT = list(), RSF = list())
   for(i in 1:numberOfFolds){
+    print(paste("Starting fold",i,"of", numberOfFolds, "total folds."))
     #Models - We evaluate values to NULL so we can pass them to evaluations, regardless if the models were ran or not.
     coxMod = NULL; kmMod = NULL; rsfMod = NULL; aftMod = NULL;
     training = normalizedData[[1]][[i]]
     testing = normalizedData[[2]][[i]]
+    print(paste("Beginning model training."))
     if(CoxKP){
       coxMod = CoxPH_KP(training, testing)
       combinedTestResults$Cox[[i]] = coxMod
@@ -83,6 +93,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     #Evaluations - Note that if evaluations are passed a NULL value they return a NULL.
     DCalResults = NULL;OneCalResults = NULL;ConcResults = NULL;BrierResults = NULL;L1Results = NULL; L2Results = NULL; 
     if(DCal){
+      print("Staring Evaluation: D-Calibration")
       coxDcal = DCalibration(coxMod, DCalBins)
       kmDcal = DCalibration(kmMod, DCalBins)
       rsfDcal = DCalibration(rsfMod, DCalBins)
@@ -90,6 +101,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       DCalResults = rbind(coxDcal, kmDcal, rsfDcal,aftDcal)
     }
     if(OneCal){
+      print("Staring Evaluation: One-Calibration")
       coxOneCal = OneCalibration(coxMod, OneCalTime, typeOneCal, oneCalBuckets)
       kmOneCal = OneCalibration(kmMod, OneCalTime, typeOneCal, oneCalBuckets)
       rsfOneCal = OneCalibration(rsfMod, OneCalTime, typeOneCal, oneCalBuckets)
@@ -97,6 +109,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       OneCalResults = rbind(coxOneCal, kmOneCal, rsfOneCal,aftOneCal)
     }
     if(Concor){
+      print("Staring Evaluation: Concordance")
       coxConcCens = Concordance(coxMod, concordanceTies, T)
       kmConcCens = Concordance(kmMod, concordanceTies, T)
       rsfConcCens = Concordance(rsfMod, concordanceTies, T)
@@ -109,18 +122,15 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       ConcUncensResults = rbind(coxConcUncens, kmConcUncens, rsfConcUncens, aftConcUncens)
     }
     if(Brier){
-      print(i)
+      print("Staring Evaluation: Brier Score")
       coxBrier = BrierScore(coxMod, BrierTime, BrierBasedOnEvents)
-      print("coxDone")
       kmBrier = BrierScore(kmMod, BrierTime, BrierBasedOnEvents)
-      print("KMDone")
       rsfBrier = BrierScore(rsfMod, BrierTime, BrierBasedOnEvents)
-      print("rsfDone")
       aftBrier = BrierScore(aftMod, BrierTime, BrierBasedOnEvents)
-      print("aftDone")
       BrierResults = rbind(coxBrier, kmBrier, rsfBrier, aftBrier)
     }
     if(L1Measure){
+      print("Staring Evaluation: L1 Loss")
       coxL1 = L1(coxMod, Ltype, Llog)
       kmL1 = L1(kmMod, Ltype, Llog)
       rsfL1 = L1(rsfMod, Ltype, Llog)
@@ -136,6 +146,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     evaluationResults = rbind.data.frame(evaluationResults, toAdd)
   }
   if(DCal){
+    print("Staring Evaluation: Cumulative D-Calibration")
     coxCumDcal = DCalibrationCumulative(combinedTestResults$Cox,numBins = numBins)
     kmCumDcal = DCalibrationCumulative(combinedTestResults$KM,numBins = numBins)
     rsfCumDcal = DCalibrationCumulative(combinedTestResults$RSF,numBins = numBins)
@@ -143,6 +154,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     DCalCumResults = c(coxCumDcal, kmCumDcal, rsfCumDcal, aftCumDcal)
   }
   if(OneCal){
+    print("Staring Evaluation: Cumulative One-Calibration")
     coxCum1cal = OneCalibrationCumulative(combinedTestResults$Cox, OneCalTime, typeOneCal, oneCalBuckets)
     kmCum1cal = OneCalibrationCumulative(combinedTestResults$KM, OneCalTime, typeOneCal, oneCalBuckets)
     rsfCum1cal = OneCalibrationCumulative(combinedTestResults$RSF, OneCalTime, typeOneCal, oneCalBuckets)
