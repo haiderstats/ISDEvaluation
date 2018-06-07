@@ -17,7 +17,7 @@ library(prodlim)
 #outside the training data so instead we take the linear fit of (0,1) and the last time point we have (p,t*) and then apply this linear
 #function to all points outside of our fit.
 predictProbabilityFromCurve = function(survivalCurve,predictedTimes, timeToPredict){
-  spline = splinefun(predictedTimes, survivalCurve, method = "monoH.FC")
+  spline = splinefun(predictedTimes, survivalCurve, method = "hyman")
   maxTime = max(predictedTimes)
   slope = (1-spline(maxTime))/(0 - max(predictedTimes))
   predictedProbabilities = rep(0, length(timeToPredict))
@@ -34,7 +34,7 @@ predictProbabilityFromCurve = function(survivalCurve,predictedTimes, timeToPredi
 
 #We calculate the mean and median survival times assuming a monotone spline fit of the survival curve points.
 predictMeanSurvivalTimeSpline = function(survivalCurve, predictedTimes){
-  spline = splinefun(predictedTimes, survivalCurve, method = "monoH.FC")
+  spline = splinefun(predictedTimes, survivalCurve, method = "hyman")
   maxTime = max(predictedTimes)
   slope = (1-spline(maxTime))/(0 - max(predictedTimes))
   zeroProbabilitiyTime = maxTime + (0-spline(maxTime))/slope
@@ -44,7 +44,7 @@ predictMeanSurvivalTimeSpline = function(survivalCurve, predictedTimes){
 }
 
 predictMedianSurvivalTimeSpline = function(survivalCurve, predictedTimes){
-  spline = splinefun(predictedTimes, survivalCurve, method = "monoH.FC")
+  spline = splinefun(predictedTimes, survivalCurve, method = "hyman")
   minProb = min(spline(predictedTimes))
   if(minProb < .5){
     maximumSmallerThanMedian = predictedTimes[min(which(survivalCurve <.5))]
