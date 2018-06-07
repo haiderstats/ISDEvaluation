@@ -5,9 +5,20 @@
 
 #Purpose and General Comments:
 #This file was created to implement D-Calibration as an evaluation measure for individual survival curves.
-#Input 1: A list of (1) a matrix of survival curves, and (2) the true death times and event/censoring indicator (delta =1 implies death/event).
+#Currently there are two options, DCalibration and DCalibrationCumulative. Since we are doing Cross validation it doesn't make much sense
+#to be averaging p-values. For this reason we have DCalibrationCumulative which takes in a list of lists containing survival curves, one entry
+#for each fold of the cross validation. 
+#DCalibration:
+#Input 1: A list of (1) a matrix of survival curves, and (2) the true death times and event/censoring indicator (delta =1 implies death/event)
+#for the TESTING Data, and (3) the true death times and event/censoring indicator (delta =1 implies death/event) for the TRAINING Data.
 #Input 2: The number of bins to evaluate D-calibration.
 #Output: The p-value associated with D-calibration.
+#DCalibrationCumulative:
+#Input 1: A list (size = number of folds) of lists each contraining (1) a matrix of survival curves, and (2) the true death 
+#times and event/censoring indicator (delta =1 implies death/event) for the TESTING Data, and (3) the true death times and event/censoring 
+#indicator (delta =1 implies death/event) for the TRAINING Data.
+#Input 2: The number of bins to evaluate D-calibration.
+#Output: The p-value associated with D-calibration across ALL survival curves.
 ##############################################################################################################################################
 #Library Dependencies
 #We use this for the sindex function.
@@ -52,7 +63,7 @@ getBinned = function(survMod,numBins, weighted = F){
   censoredBinPositions = sindex(quantiles,censoredProbabilities, comp = "greater", strict = T)
   quantileWidth = 1/numBins
   firstBin = ifelse(censoredBinPositions == numBins,1,(censoredProbabilities - quantiles[censoredBinPositions+1])/censoredProbabilities)
-  restOfBins = ifelse(censoredProbabilities ==0,1,(1/numBins)/censoredProbabilities)
+  restOfBins = ifelse(censoredProbabilities ==0,1,1/(numBins*censoredProbabilities))
 
   listOfContributions = lapply(seq_along(censoredBinPositions),function(x) c(rep(0, censoredBinPositions[x] -1),
                                                                              rep(firstBin[x],1),
