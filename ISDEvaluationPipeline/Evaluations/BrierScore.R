@@ -27,8 +27,10 @@ library(prodlim)
 #Helper functions:
 source("Evaluations/EvaluationHelperFunctions.R")
 
-BrierScore = function(survMod, BrierTime, basedOnEvents=F){
+BrierScore = function(survMod, BrierTime = NULL, basedOnEvents=F){
   if(is.null(survMod)) return(NULL)
+  if(is.null(BrierTime)) 
+    BrierTime = c(0, max(c(survMod[[2]]$time, survMod[[3]]$time))) #max time of the training and testing set combined (the entire dataset).
   score = ifelse(length(BrierTime) ==1,
                  singleBrier(survMod, BrierTime),
                  ifelse(basedOnEvents,integratedBrier(survMod, BrierTime),
