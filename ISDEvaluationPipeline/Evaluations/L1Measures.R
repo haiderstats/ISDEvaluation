@@ -63,11 +63,10 @@ L1 = function(survMod, type = "Uncensored", logScale = F){
                        bestGuess = unlist(lapply(censorTimes,
                               function(time) time + integrate(KMLinearPredict,
                                                               lower = time, upper = Inf,subdivisions = 1000)[[1]]/KMLinearPredict(time)))
-                       weights = cumsum(censorStatus[order(trueDeathTimes)])/sum(censorStatus)
-                       censorWeights = weights[as.logical(1-censorStatus[order(trueDeathTimes)])]
+                       weights = 1- KMLinearPredict(censorTimes)
                        marginPiece = ifelse(!logScale,
-                                            sum(censorWeights*(abs(bestGuess[order(censorTimes)] - averageCensored[order(censorTimes)]))),
-                                            sum(censorWeights*(abs(log(bestGuess[order(censorTimes)])-log(averageCensored[order(censorTimes)]))))
+                                            sum(weights*(abs(bestGuess - averageCensored))),
+                                            sum(weights*(abs(log(bestGuess)-log(averageCensored))))
                        )
                        L1Measure = (1/length(censorStatus))*(uncensoredPiece + marginPiece)
                      }
