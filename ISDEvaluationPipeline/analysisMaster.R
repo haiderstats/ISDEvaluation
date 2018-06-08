@@ -46,7 +46,7 @@ survivalDataset$sex = factor(survivalDataset$sex,levels = c(1,2), labels= c("Mal
 survivalDataset[1:5, 4] = NA
 
 
-colonSurv = colon[2:15]
+colonSurv = colon[3:16]
 names(colonSurv)[8] = "delta"
 colonSurv$sex = as.factor(colonSurv$sex)
 colonSurv$obstruct = as.factor(colonSurv$obstruct)
@@ -144,13 +144,14 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     models = c("CoxKP","Kaplan-Meier","RSF","AFT")[modelsRan]
     toAdd = cbind.data.frame(Model = models,FoldNumer = i, toAdd)
     evaluationResults = rbind.data.frame(evaluationResults, toAdd)
+    print(evaluationResults)
   }
   if(DCal){
     print("Staring Evaluation: Cumulative D-Calibration")
-    coxCumDcal = DCalibrationCumulative(combinedTestResults$Cox,numBins = numBins)
-    kmCumDcal = DCalibrationCumulative(combinedTestResults$KM,numBins = numBins)
-    rsfCumDcal = DCalibrationCumulative(combinedTestResults$RSF,numBins = numBins)
-    aftCumDcal = DCalibrationCumulative(combinedTestResults$AFT,numBins = numBins)
+    coxCumDcal = DCalibrationCumulative(combinedTestResults$Cox,DCalBins)
+    kmCumDcal = DCalibrationCumulative(combinedTestResults$KM,DCalBins)
+    rsfCumDcal = DCalibrationCumulative(combinedTestResults$RSF,DCalBins)
+    aftCumDcal = DCalibrationCumulative(combinedTestResults$AFT,DCalBins)
     DCalCumResults = c(coxCumDcal, kmCumDcal, rsfCumDcal, aftCumDcal)
   }
   if(OneCal){
