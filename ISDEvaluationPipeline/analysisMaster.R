@@ -62,12 +62,12 @@ analysisMaster = function(survivalDataset, numberOfFolds,
                           typeOneCal = "BucketKM", oneCalBuckets = 10, #Evaluation args
                           AFTDistribution = "weibull", ntree = 1000 #Model args
                           ){
-  set.seed(42)
   validatedData = validateAndClean(survivalDataset)
   normalizedData = createFoldsAndNormalize(validatedData, numberOfFolds)
   evaluationResults = data.frame()
   combinedTestResults = list(Cox = list(), KM = list(), AFT = list(), RSF = list())
   for(i in 1:numberOfFolds){
+    print(Sys.time())
     print(paste("Starting fold",i,"of", numberOfFolds, "total folds."))
     #Models - We evaluate values to NULL so we can pass them to evaluations, regardless if the models were ran or not.
     coxMod = NULL; kmMod = NULL; rsfMod = NULL; aftMod = NULL;
@@ -163,7 +163,8 @@ analysisMaster = function(survivalDataset, numberOfFolds,
   }
   return(list(evaluationResults, DCalCumResults,OneCalCumResults) )
 }
-
+set.seed(42)
+dat = analysisMaster(colonSurv, 5)
 
 
 
