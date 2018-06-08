@@ -53,7 +53,7 @@ OneCalibration = function(survMod, timeOfInterest = NULL, type = "BucketKM", num
                               function(index) predictProbabilityFromCurve(survivalCurves[,index],
                                                                           predictedTimes,
                                                                           timeOfInterest)))
-  pval = binItUp(trueDeathTimes, censorStatus, predictions, type, numBuckets)
+  pval = binItUp(trueDeathTimes, censorStatus, predictions, type, numBuckets,timeOfInterest)
   return(pval)
 }
 
@@ -85,12 +85,12 @@ OneCalibrationCumulative = function(listOfSurvivalModels, timeOfInterest = NULL,
                               function(index) predictProbabilityFromCurve(survivalCurves[[model]][,index],
                                                                           predictedTimes[[model]],
                                                                           timeOfInterest))))
-  pval = binItUp(unlist(trueDeathTimes),unlist(censorStatus), predictions, type, numBuckets)
+  pval = binItUp(unlist(trueDeathTimes),unlist(censorStatus), predictions, type, numBuckets,timeOfInterest)
   return(pval)
 }
 
 
-binItUp = function(trueDeathTimes,censorStatus, predictions, type, numBuckets){
+binItUp = function(trueDeathTimes,censorStatus, predictions, type, numBuckets,timeOfInterest){
   #We need to divide the number of predictions into as equal size buckets as possible. The formula for this can be found here:
   #https://math.stackexchange.com/questions/199690/divide-n-items-into-m-groups-with-as-near-equal-size-as-possible
   numberOfBucketsWithExtra = length(predictions) %% numBuckets
