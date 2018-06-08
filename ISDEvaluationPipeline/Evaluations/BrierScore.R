@@ -86,7 +86,7 @@ singleBrierMultiplePoints = function(survMod, BrierTimes){
   #Catch if event times goes over max training event time, i.e. predict gives NA
   weightCat1Mat[is.na(weightCat1Mat)] = 0
 
-  weightCat2Mat = (eventTimes[orderOfTimes] > bsPointsMat)%*%diag(predict(invProbCensor, BrierTimes,level.chaos = 2))
+  weightCat2Mat = t(t((eventTimes[orderOfTimes] > bsPointsMat))*predict(invProbCensor, BrierTimes,level.chaos = 2))
   #Catch if BrierTimes goes over max event time, i.e. predict gives NA
   weightCat2Mat[is.na(weightCat2Mat)] = 0
   
