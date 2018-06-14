@@ -26,8 +26,6 @@ MTLR = function(training, testing){
   system("java -cp ./ ConvertDataFiles convert2MTLR Data/training.csv Data/training.mtlr FlipCensoredBit")
   system("java -cp ./ ConvertDataFiles convert2MTLR Data/testing.csv Data/testing.mtlr FlipCensoredBit")
   system("./mtlr_opt -i Data/training.mtlr",ignore.stdout = T)
-  system("rm Ptrain1")
-  system("rm Pmodel1")
   system("./mtlr_test -i Data/testing.mtlr -s Data/training.mtlr -o ./fold1_modelfile > Output/MTLR_output.txt")
   system("rm CI_log")
   timePoints = unlist((unname(read.table("fold1_modelfile",skip = 1,sep = ",",nrows = 1))))
@@ -38,6 +36,8 @@ MTLR = function(training, testing){
   #Add the last time point and a 0 time point.
   timePoints = c(0,timePoints, lastTimePoint)
   testingPoints = read.table("Output/MTLR_output.txt")
+  #Clean up directory:
+  system("rm fold1_modelfile CI_log Ptrain1 Pmodel1 Data/* Output/*")
   #Replace original working directory.
   setwd(originalWd)
   #the first 4 columns are the true time of death, 1- censoring status, and 2 different averaged survival times.
