@@ -25,6 +25,7 @@ source("Models/CoxPH_KP.R")
 source("Models/KaplanMeier.R")
 source("Models/RandomSurvivalForests.R")
 source("Models/AcceleratedFailureTime.R")
+source("Models/MTLR.R")
 
 #As of May 26, I'm not sure if PSSP has an R implementation or if it is in some other language.
 #We will leave a commented out R file for now.
@@ -55,7 +56,7 @@ colonSurv$adhere = as.factor(colonSurv$adhere)
 colonSurv$surg = as.factor(colonSurv$surg)
 
 analysisMaster = function(survivalDataset, numberOfFolds,
-                          CoxKP = T, KaplanMeier = T, RSFModel = T, AFTModel = T, #Models
+                          CoxKP = T, KaplanMeier = T, RSFModel = T, AFTModel = T, MTLRModel =T, #Models
                           DCal = T, OneCal = T, Concor = T, L1Measure = T, Brier = T, #Evaluations
                           DCalBins = 10, OneCalTime = NULL,  concordanceTies = "None", #Evaluation args
                           BrierTime = NULL, BrierBasedOnEvents = F, Ltype = "Margin", Llog = F, #Evaluation args
@@ -65,12 +66,12 @@ analysisMaster = function(survivalDataset, numberOfFolds,
   validatedData = validateAndClean(survivalDataset)
   normalizedData = createFoldsAndNormalize(validatedData, numberOfFolds)
   evaluationResults = data.frame()
-  combinedTestResults = list(Cox = list(), KM = list(), AFT = list(), RSF = list())
+  combinedTestResults = list(Cox = list(), KM = list(), AFT = list(), RSF = list(), MTLR = list())
   for(i in 1:numberOfFolds){
     print(Sys.time())
     print(paste("Starting fold",i,"of", numberOfFolds, "total folds."))
     #Models - We evaluate values to NULL so we can pass them to evaluations, regardless if the models were ran or not.
-    coxMod = NULL; kmMod = NULL; rsfMod = NULL; aftMod = NULL;
+    coxMod = NULL; kmMod = NULL; rsfMod = NULL; aftMod = NULL; MTLRMod = NULL;
     training = normalizedData[[1]][[i]]
     testing = normalizedData[[2]][[i]]
     print(paste("Beginning model training."))
@@ -90,6 +91,10 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       aftMod = AFT(training, testing, AFTDistribution)
       combinedTestResults$AFT[[i]] = aftMod
     }
+    if(MTLRModel){
+      mtlrMod = MTLR(training, testing)
+      combinedTestResults$MTLR[[i]] = mtlrMod
+    }
     #Evaluations - Note that if evaluations are passed a NULL value they return a NULL.
     DCalResults = NULL;OneCalResults = NULL;ConcResults = NULL;BrierResults = NULL;L1Results = NULL; L2Results = NULL; 
     if(DCal){
@@ -98,7 +103,8 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       kmDcal = DCalibration(kmMod, DCalBins)
       rsfDcal = DCalibration(rsfMod, DCalBins)
       aftDcal = DCalibration(aftMod, DCalBins)
-      DCalResults = rbind(coxDcal, kmDcal, rsfDcal,aftDcal)
+      mtlrDcal = DCalibration(mtlrMod, DCalBins)
+      DCalResults = rbind(coxDcal, kmDcal, rsfDcal,aftDcal,mtlrDcal)
     }
     if(OneCal){
       print("Staring Evaluation: One-Calibration")
@@ -106,7 +112,8 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       kmOneCal = OneCalibration(kmMod, OneCalTime, typeOneCal, oneCalBuckets)
       rsfOneCal = OneCalibration(rsfMod, OneCalTime, typeOneCal, oneCalBuckets)
       aftOneCal = OneCalibration(aftMod, OneCalTime, typeOneCal, oneCalBuckets)
-      OneCalResults = rbind(coxOneCal, kmOneCal, rsfOneCal,aftOneCal)
+      mtlrOneCal = OneCalibration(mtlrMod, OneCalTime, typeOneCal, oneCalBuckets)
+      OneCalResults = rbind(coxOneCal, kmOneCal, rsfOneCal,aftOneCal, mtlrOneCal)
     }
     if(Concor){
       print("Staring Evaluation: Concordance")
@@ -114,12 +121,16 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       kmConcCens = Concordance(kmMod, concordanceTies, T)
       rsfConcCens = Concordance(rsfMod, concordanceTies, T)
       aftConcCens = Concordance(aftMod, concordanceTies, T)
+      mtlrConcCens = Concordance(mtlrMod, concordanceTies, T)
+      
       coxConcUncens = Concordance(coxMod, concordanceTies, F)
       kmConcUncens = Concordance(kmMod, concordanceTies, F)
       rsfConcUncens = Concordance(rsfMod, concordanceTies, F)
       aftConcUncens = Concordance(aftMod, concordanceTies, F)
-      ConcCensResults = rbind(coxConcCens, kmConcCens, rsfConcCens, aftConcCens)
-      ConcUncensResults = rbind(coxConcUncens, kmConcUncens, rsfConcUncens, aftConcUncens)
+      mtlrConcUncens = Concordance(mtlrMod, concordanceTies, F)
+      
+      ConcCensResults = rbind(coxConcCens, kmConcCens, rsfConcCens, aftConcCens, mtlrConcCens)
+      ConcUncensResults = rbind(coxConcUncens, kmConcUncens, rsfConcUncens, aftConcUncens, mtlrConcUncens)
     }
     if(Brier){
       print("Staring Evaluation: Brier Score")
@@ -127,7 +138,9 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       kmBrier = BrierScore(kmMod, BrierTime, BrierBasedOnEvents)
       rsfBrier = BrierScore(rsfMod, BrierTime, BrierBasedOnEvents)
       aftBrier = BrierScore(aftMod, BrierTime, BrierBasedOnEvents)
-      BrierResults = rbind(coxBrier, kmBrier, rsfBrier, aftBrier)
+      mtlrBrier = BrierScore(mtlrMod, BrierTime, BrierBasedOnEvents)
+      
+      BrierResults = rbind(coxBrier, kmBrier, rsfBrier, aftBrier, mtlrBrier)
     }
     if(L1Measure){
       print("Staring Evaluation: L1 Loss")
@@ -135,13 +148,15 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       kmL1 = L1(kmMod, Ltype, Llog)
       rsfL1 = L1(rsfMod, Ltype, Llog)
       aftL1 = L1(aftMod, Ltype, Llog)
-      L1Results = rbind(coxL1,kmL1,rsfL1,aftL1)
+      mtlrL1 = L1(mtlrMod, Ltype, Llog)
+      
+      L1Results = rbind(coxL1,kmL1,rsfL1,aftL1,mtlrL1)
     }
     toAdd = as.data.frame(cbind(DCalResults, OneCalResults, ConcCensResults,ConcUncensResults, BrierResults, L1Results))
     metricsRan = c(DCal, OneCal, Concor,Concor, L1Measure, Brier)
     names(toAdd) = c("DCalibration","OneCalibration","ConcordanceCensored","ConcordanceUncensensore","BrierResults", "L1Results")[metricsRan]
-    modelsRan = c(CoxKP, KaplanMeier, RSFModel, AFTModel)
-    models = c("CoxKP","Kaplan-Meier","RSF","AFT")[modelsRan]
+    modelsRan = c(CoxKP, KaplanMeier, RSFModel, AFTModel, MTLRModel)
+    models = c("CoxKP","Kaplan-Meier","RSF","AFT", "MTLR")[modelsRan]
     toAdd = cbind.data.frame(Model = models,FoldNumer = i, toAdd)
     evaluationResults = rbind.data.frame(evaluationResults, toAdd)
     print(evaluationResults)
@@ -152,7 +167,9 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     kmCumDcal = DCalibrationCumulative(combinedTestResults$KM,DCalBins)
     rsfCumDcal = DCalibrationCumulative(combinedTestResults$RSF,DCalBins)
     aftCumDcal = DCalibrationCumulative(combinedTestResults$AFT,DCalBins)
-    DCalCumResults = c(coxCumDcal, kmCumDcal, rsfCumDcal, aftCumDcal)
+    mtlrCumDcal = DCalibrationCumulative(combinedTestResults$MTLR,DCalBins)
+    
+    DCalCumResults = c(coxCumDcal, kmCumDcal, rsfCumDcal, aftCumDcal, mtlrCumDcal)
   }
   if(OneCal){
     print("Staring Evaluation: Cumulative One-Calibration")
@@ -160,7 +177,9 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     kmCum1cal = OneCalibrationCumulative(combinedTestResults$KM, OneCalTime, typeOneCal, oneCalBuckets)
     rsfCum1cal = OneCalibrationCumulative(combinedTestResults$RSF, OneCalTime, typeOneCal, oneCalBuckets)
     aftCum1cal = OneCalibrationCumulative(combinedTestResults$AFT, OneCalTime, typeOneCal, oneCalBuckets)
-    OneCalCumResults = c(coxCum1cal, kmCum1cal, rsfCum1cal, aftCum1cal)
+    mtlrCum1cal = OneCalibrationCumulative(combinedTestResults$MTLR, OneCalTime, typeOneCal, oneCalBuckets)
+    
+    OneCalCumResults = c(coxCum1cal, kmCum1cal, rsfCum1cal, aftCum1cal, mtlrCum1cal)
   }
   return(list(evaluationResults, DCalCumResults,OneCalCumResults) )
 }
