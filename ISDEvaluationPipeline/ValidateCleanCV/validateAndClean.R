@@ -32,6 +32,10 @@ validate = function(survivalDataset){
     stop("The variable 'delta' in not included in the given dataset.")
   survivalDataset$time = as.numeric(survivalDataset$time)
   survivalDataset$delta = as.numeric(survivalDataset$delta)
+  #We want to change the ordering so that the time column is first and the delta column is second.
+  timeIndex = which(names(survivalDataset) == "time")
+  deltaIndex = which(names(survivalDataset) == "delta")
+  survivalDataset = survivalDataset[,c(timeIndex,deltaIndex, (1:ncol(survivalDataset))[-c(timeIndex,deltaIndex)])]
   if(any(is.na(survivalDataset$time))){
     warning("'time' includes NA values. These rows have been removed.")
     NAtimeIndex = which(is.na(survivalDataset$time))
