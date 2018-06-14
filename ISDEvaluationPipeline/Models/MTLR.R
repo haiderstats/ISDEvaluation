@@ -28,7 +28,6 @@ MTLR = function(training, testing){
   system("java -cp ./ ConvertDataFiles convert2MTLR testing.csv testing.mtlr FlipCensoredBit")
   system("./mtlr_opt -i training.mtlr",ignore.stdout = T)
   system("./mtlr_test -i testing.mtlr -s training.mtlr -o ./fold1_modelfile > MTLR_output.txt")
-  system("rm CI_log")
   timePoints = unlist((unname(read.table("fold1_modelfile",skip = 1,sep = ",",nrows = 1))))
   #There are more survival probabilities than survival time points. Further, the previous writer of code (Fatima) used the last time point
   #squared divided by the second to last time point. I'm guessing that that this was done using some information not known to me at 
