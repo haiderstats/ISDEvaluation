@@ -16,17 +16,18 @@
 ############################################################################################################################################
 
 MTLR = function(training, testing){
+  #The idea here is to have the working directory sitting in ISDEvaluationPipeline. We move the working directory into the folder
+  #with executables for ease of execution and move back to the original working directory before exiting the function.
   executablesPath = "Models/AdditionalMTLRFiles/"
   originalWd = getwd()
   setwd(paste(originalWd,"/",executablesPath,sep=""))
   #Write csv files to be called by CovertDataFiles to make the correct format of input for MTLR.
-  write.csv(training, paste("Data/training.csv",sep=""), row.names = F)
-  write.csv(testing, paste("Data/testing.csv",sep=""), row.names = F)
-  #We have hardcoded the paths to the data sets. Future use of this code may need to change these 
-  system("java -cp ./ ConvertDataFiles convert2MTLR Data/training.csv Data/training.mtlr FlipCensoredBit")
-  system("java -cp ./ ConvertDataFiles convert2MTLR Data/testing.csv Data/testing.mtlr FlipCensoredBit")
-  system("./mtlr_opt -i Data/training.mtlr",ignore.stdout = T)
-  system("./mtlr_test -i Data/testing.mtlr -s Data/training.mtlr -o ./fold1_modelfile > Output/MTLR_output.txt")
+  write.csv(training, paste("training.csv",sep=""), row.names = F)
+  write.csv(testing, paste("testing.csv",sep=""), row.names = F)
+  system("java -cp ./ ConvertDataFiles convert2MTLR training.csv training.mtlr FlipCensoredBit")
+  system("java -cp ./ ConvertDataFiles convert2MTLR testing.csv testing.mtlr FlipCensoredBit")
+  system("./mtlr_opt -i training.mtlr",ignore.stdout = T)
+  system("./mtlr_test -i testing.mtlr -s training.mtlr -o ./fold1_modelfile > MTLR_output.txt")
   system("rm CI_log")
   timePoints = unlist((unname(read.table("fold1_modelfile",skip = 1,sep = ",",nrows = 1))))
   #There are more survival probabilities than survival time points. Further, the previous writer of code (Fatima) used the last time point
@@ -35,9 +36,9 @@ MTLR = function(training, testing){
   lastTimePoint = round(timePoints[length(timePoints)]^2/timePoints[length(timePoints) -1])
   #Add the last time point and a 0 time point.
   timePoints = c(0,timePoints, lastTimePoint)
-  testingPoints = read.table("Output/MTLR_output.txt")
+  testingPoints = read.table("MTLR_output.txt")
   #Clean up directory:
-  system("rm fold1_modelfile CI_log Ptrain1 Pmodel1 Data/* Output/*")
+  system("rm fold1_modelfile CI_log Ptrain1 Pmodel1 *.csv *.mtlr *.txt")
   #Replace original working directory.
   setwd(originalWd)
   #the first 4 columns are the true time of death, 1- censoring status, and 2 different averaged survival times.
