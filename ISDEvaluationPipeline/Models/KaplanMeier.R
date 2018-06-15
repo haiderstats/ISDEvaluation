@@ -19,9 +19,10 @@ library(prodlim)
 
 KM = function(training, testing){
   kmMod = prodlim(Surv(time,delta)~1, data = training)
-  timesToPredict = c(0,sort(unique(training$time)))
-  probabilities = predict(kmMod,timesToPredict)
-  curvesToReturn = cbind.data.frame(time = timesToPredict,matrix(rep(probabilities,nrow(testing)),ncol = nrow(testing)))
+  trainingTimes = c(sort(unique(training$time)))
+  times = ifelse(0 %in% trainingTimes,trainingTimes, c(0,trainingTimes))
+  probabilities = predict(kmMod,times)
+  curvesToReturn = cbind.data.frame(time = times,matrix(rep(probabilities,nrow(testing)),ncol = nrow(testing)))
   timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
   return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))   

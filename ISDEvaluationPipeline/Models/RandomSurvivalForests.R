@@ -23,8 +23,9 @@ library(randomForestSRC)
 RSF = function(training, testing, ntree){
   rsfMod = rfsrc(Surv(time,delta)~., data = training, ntree = ntree)
   survivalCurves = predict(rsfMod, testing)
-  probabilities = rbind.data.frame(1,t(survivalCurves$survival))
-  times = c(sort(unique(training$time*training$delta)))
+  trainingTimes = survivalCurves$time.interest
+  times = ifelse(0 %in% trainingTimes, trainingTimes,c(0,trainingTimes))
+  probabilities = ifelse(0 %in% trainingTimes,t(survivalCurves$survival),rbind.data.frame(1,t(survivalCurves$survival)))
   curvesToReturn = cbind.data.frame(time = times, probabilities)
   timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
