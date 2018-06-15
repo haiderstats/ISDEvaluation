@@ -61,6 +61,8 @@ getBinned = function(survMod,numBins, weighted = F){
                                                                          uncensoredProbabilities < quantiles[x-1]))))
   censoredProbabilities = deathProbabilities[as.logical(1-censorStatus)]
   censoredBinPositions = sindex(quantiles,censoredProbabilities, comp = "greater", strict = T)
+  #Sometimes the probability will be 1 in which case we just want to put them in the first bin. 
+  censoredBinPositions = ifelse(censoredBinPositions ==0, 1,censoredBinPositions)
   quantileWidth = 1/numBins
   firstBin = ifelse(censoredBinPositions == numBins,1,(censoredProbabilities - quantiles[censoredBinPositions+1])/censoredProbabilities)
   restOfBins = ifelse(censoredProbabilities ==0,1,1/(numBins*censoredProbabilities))
