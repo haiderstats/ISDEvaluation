@@ -37,24 +37,6 @@ source("Evaluations/Concordance.R")
 source("Evaluations/L1Measures.R")
 source("Evaluations/BrierScore.R")
 
-#For now we will use an example dataset.
-survivalDataset = lung[,-1]
-names(survivalDataset)[2] = "delta"
-survivalDataset$delta = ifelse(survivalDataset$delta == 2, 1,0)
-survivalDataset$ph.ecog = as.factor(survivalDataset$ph.ecog)
-survivalDataset$sex = factor(survivalDataset$sex,levels = c(1,2), labels= c("Male","Female"))
-#add some NA values to sex for fun
-survivalDataset[1:5, 4] = NA
-
-
-colonSurv = colon[3:16]
-names(colonSurv)[8] = "delta"
-colonSurv$sex = as.factor(colonSurv$sex)
-colonSurv$obstruct = as.factor(colonSurv$obstruct)
-colonSurv$perfor = as.factor(colonSurv$perfor)
-colonSurv$adhere = as.factor(colonSurv$adhere)
-colonSurv$surg = as.factor(colonSurv$surg)
-
 analysisMaster = function(survivalDataset, numberOfFolds,
                           CoxKP = T, KaplanMeier = T, RSFModel = T, AFTModel = T, MTLRModel =T, #Models
                           DCal = T, OneCal = T, Concor = T, L1Measure = T, Brier = T, #Evaluations
@@ -183,8 +165,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
   }
   return(list(evaluationResults, DCalCumResults,OneCalCumResults) )
 }
-set.seed(42)
-dat = analysisMaster(colonSurv, 5)
+
 
 
 
