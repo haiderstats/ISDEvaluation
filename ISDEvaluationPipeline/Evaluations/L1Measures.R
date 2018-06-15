@@ -64,7 +64,7 @@ L1 = function(survMod, type = "Uncensored", logScale = F){
                        bestGuess = unlist(lapply(censorTimes,
                               function(time) time + integrate(KMLinearPredict,
                                                               lower = time, 
-                                                              upper = KMLinearZero,subdivisions = 2000)[[1]]/KMLinearPredict(time)))
+                                                              upper = KMLinearZero,subdivisions = 2000,rel.tol = .01)[[1]]/KMLinearPredict(time)))
                        weights = 1- KMLinearPredict(censorTimes)
                        marginPiece = ifelse(!logScale,
                                             sum(weights*(abs(bestGuess - averageCensored))),
