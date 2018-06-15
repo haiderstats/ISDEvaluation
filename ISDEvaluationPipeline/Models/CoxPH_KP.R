@@ -19,8 +19,13 @@ library(survival)
 CoxPH_KP = function(training, testing){
   coxMod = coxph(Surv(time,delta)~., data = training)
   survivalCurves = survfit(coxMod, testing, type = "kalbfleisch-prentice")
-  timePoints = ifelse(0 %in% survivalCurves$time,survivalCurves$time, c(0,survivalCurves$time))
-  probabilities = ifelse(0 %in% survivalCurves$time,survivalCurves$surv,rbind(1,survivalCurves$surv))
+  if(0 %in% survivalCurves$time){
+    timePoints = survivalCurves$time
+    probabilities = survivalCurves$surv
+  } else{
+    timePoints = c(0,survivalCurves$time)
+    probabilities = rbind(1,survivalCurves$surv)
+  }
   curvesToReturn = cbind.data.frame(time = timePoints, probabilities)
   timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)

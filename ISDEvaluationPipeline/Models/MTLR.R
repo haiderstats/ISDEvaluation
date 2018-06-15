@@ -34,7 +34,11 @@ MTLR = function(training, testing){
   #this time so until further notice we will do the same.
   lastTimePoint = round(times[length(times)]^2/times[length(times) -1])
   #Add the last time point and a 0 time point if needed.
-  timePoints = ifelse(0 %in% times, c(times,lastTimePoint),c(0,times, lastTimePoint))
+  if(0 %in% times){
+    timePoints = c(times,lastTimePoint)
+  } else{
+    timePoints = c(0,times, lastTimePoint)
+  } 
   testingPoints = read.table("MTLR_output.txt")
   #Clean up directory:
   system("rm fold1_modelfile CI_log Ptrain1 Pmodel1 *.csv *.mtlr *.txt")
@@ -54,8 +58,11 @@ MTLR = function(training, testing){
   #Some of the last survival probabilities were negative so we turned these to zero. There were values like -1.2239e-17 so effectively 
   #zero anyways. Additionally we need to transpose the survival probabilities to match up with the survival time estimates and then
   #add a survival probability of 1 to the 0th time point if there was no original 0 time point.
-  survivalProbabilities = ifelse(0 %in% times, t(apply(survivalProbabilities, c(1,2), function(x) ifelse(x < 0,0,x))),
-                                 rbind(1,t(apply(survivalProbabilities, c(1,2), function(x) ifelse(x < 0,0,x)))))
+  if(0 %in% times){
+    survivalProbabilities = t(apply(survivalProbabilities, c(1,2), function(x) ifelse(x < 0,0,x)))
+  } else {
+    survivalProbabilities = rbind(1,t(apply(survivalProbabilities, c(1,2), function(x) ifelse(x < 0,0,x))))
+  }
   curvesToReturn = cbind.data.frame(time = timePoints, survivalProbabilities) 
   timesAndCensTest = cbind.data.frame(time = trueDeathTimes, delta = censorStatus)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)

@@ -22,7 +22,11 @@ library(survival)
 AFT = function(training, testing, AFTDistribution){
   aftMod = survreg(Surv(time,delta)~., data = training, dist = AFTDistribution)
   trainingTimes = sort(unique(training$time))
-  timesToPredict = ifelse(0 %in% trainingTimes, trainingTimes, c(0,trainingTimes))
+  if(0 %in% trainingTimes){
+    timesToPredict = trainingTimes
+  } else {
+    timesToPredict = c(0,trainingTimes)
+  }
   survivalCurves = survfunc(aftMod, newdata = testing, t = timesToPredict)
   probabilities = survivalCurves$sur
   #Since survfunc returns survival probabilities with the first time point for every individual (ordered by how the testing individuals)
