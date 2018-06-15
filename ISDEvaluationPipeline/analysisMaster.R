@@ -58,22 +58,27 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     testing = normalizedData[[2]][[i]]
     print(paste("Beginning model training."))
     if(CoxKP){
+      print("Starting Cox Proportional Hazards.")
       coxMod = CoxPH_KP(training, testing)
       combinedTestResults$Cox[[i]] = coxMod
     }
     if(KaplanMeier){
+      print("Starting Kaplan Meier.")
       kmMod = KM(training, testing)
       combinedTestResults$KM[[i]] = kmMod
     }
     if(RSFModel){
+      print("Starting Random Survival Forests.")
       rsfMod = RSF(training, testing,ntree = ntree)
       combinedTestResults$RSF[[i]] = rsfMod
     }
     if(AFTModel){
+      print("Starting Accelerated Failure Time.")
       aftMod = AFT(training, testing, AFTDistribution)
       combinedTestResults$AFT[[i]] = aftMod
     }
     if(MTLRModel){
+      print("Starting Multi-task Logistic Regression (PSSP).")
       mtlrMod = MTLR(training, testing)
       combinedTestResults$MTLR[[i]] = mtlrMod
     }
