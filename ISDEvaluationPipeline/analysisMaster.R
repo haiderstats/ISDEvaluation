@@ -166,6 +166,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     mtlrCumDcal = DCalibrationCumulative(combinedTestResults$MTLR,DCalBins)
     
     DCalCumResults = c(coxCumDcal, kmCumDcal, rsfCumDcal, aftCumDcal, mtlrCumDcal)
+    evaluationResults$DCalCumResults = rep(DCalCumResults, numberOfFolds)
   }
   if(OneCal){
     print("Staring Evaluation: Cumulative One-Calibration")
@@ -176,8 +177,10 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     mtlrCum1cal = OneCalibrationCumulative(combinedTestResults$MTLR, OneCalTime, typeOneCal, oneCalBuckets)
     
     OneCalCumResults = c(coxCum1cal, kmCum1cal, rsfCum1cal, aftCum1cal, mtlrCum1cal)
+    evaluationResults$OneCalCumResults = rep(OneCalCumResults, numberOfFolds)
+    
   }
-  return(list(evaluationResults, DCalCumResults,OneCalCumResults) )
+  return(evaluationResults)
 }
 
 
