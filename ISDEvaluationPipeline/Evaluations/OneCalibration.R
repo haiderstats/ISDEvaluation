@@ -42,12 +42,18 @@ OneCalibration = function(survMod, timeOfInterest = NULL, type = "BucketKM", num
     timeOfInterest = tryCatch({
       quantile(KMCurve,.5)$quantiles.survival$quantile
     },
-    #Catch the case where there is too many censored patients to generate a KM Curve. In this case we use our linear extension to find the 
-    #Median.
+    #Catch the case where there is too many censored patients to generate a KM Curve to the median line.
+    #In this case we use our linear extension to find the median.
     error = function(e){
       slope = (1-min(KMCurve$surv))/(0 - max(KMCurve$time))
       timeOfInterest = (-0.5)/slope
     })
+  }
+  #Additionally sometimes the quantile function will return NA instead of an error if it still able to produce a lower bound. Here we 
+  #do the same thing as above when we catch the error.
+  if(is.na(timeOfInterest)){
+    slope = (1-min(KMCurve$surv))/(0 - max(KMCurve$time))
+    timeOfInterest = (-0.5)/slope
   }
   predictions = unlist(lapply(seq_along(trueDeathTimes),
                               function(index) predictProbabilityFromCurve(survivalCurves[,index],
@@ -162,7 +168,8 @@ binItUp = function(trueDeathTimes,censorStatus, predictions, type, numBuckets,ti
                                                      predict(prodlim(Surv(time, delta)~1),timeOfInterest)))
                   observed = numDied$deadCount
                   expected = 1-bucketSurvival$survivalPrediction
-                  HLStat = sum((bucketSizes*(observed-expected)^2)/((1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction))
+                  HLStat = (bucketSizes*(observed-expected)^2)/((1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction)
+                  HLStat = sum(ifelse(is.nan(HLStat),0,HLStat))
                   #See comments in file header for reasoning of degree of freedom choice.
                   DoF = ifelse(numBuckets > 15, numBuckets -2, numBuckets-1)
                   pval = 1-pchisq(HLStat, DoF)
