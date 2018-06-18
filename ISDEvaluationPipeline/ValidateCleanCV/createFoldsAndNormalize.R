@@ -134,9 +134,22 @@ normalizeVariables = function(listOfImputedDatasets, numberOfFolds){
     trainFactorEncoded = predict(oneHotEncoder, trainFactor)
     testFactorEncoded = predict(oneHotEncoder, testFactor)
     
-    #Combine one-hot encoded factor variables and normalized numeric variables and save them as th
+    #Combine one-hot encoded factor variables and normalized numeric variables and save them as one data frame.
     listOfImputedDatasets$Training[[i]] = cbind.data.frame(timeDeltaTrain,trainNumericNormalized, trainFactorEncoded)
     listOfImputedDatasets$Testing[[i]] = cbind.data.frame(timeDeltaTest,testNumericNormalized, testFactorEncoded)
+    
+    #We need to make sure that there is no comma in any of the file names or this can wreck functions using csvs.
+    #We will search for these and remove them. Ideally we could do this once for the entire dataset but this would require
+    #checking all variables and then all the levels of all the factor variables. Since this is linear in the number of 
+    #features this check shouldn't be computationally difficult so we will do the "lazy" way and check for commas here 
+    #and remove them for every fold.
+    namesWithCommas = which(grepl(",",names(listOfImputedDatasets$Training[[i]])))
+    if(length(namesWithCommas) > 0){
+      names(listOfImputedDatasets$Training[[i]])[namesWithCommas] = sub(",","COMMA",
+                                                                        names(listOfImputedDatasets$Training[[i]])[namesWithCommas])
+      names(listOfImputedDatasets$Testing[[i]])[namesWithCommas] = sub(",","COMMA",
+                                                                        names(listOfImputedDatasets$Testing[[i]])[namesWithCommas])
+    }
   }
   return(listOfImputedDatasets)
 }
