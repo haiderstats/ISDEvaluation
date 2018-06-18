@@ -13,8 +13,8 @@
 #Input: Survival Dataset
 #Output: Survival Dataset which has been validated and had minor cleaning.
 ############################################################################################################################################
-#No library calls needed.
-
+#We call caret for the nearZeroVar function. This function will let us remove variables with all the same value.
+library(caret)
 #Functions:
 
 validateAndClean = function(survivalDataset){
@@ -64,13 +64,22 @@ validate = function(survivalDataset){
 }
 
 clean = function(survivalDataset){
+  #Remove columns with no variance.
+  allSame = nearZeroVar(survivalDataset,freqCut = 100/0)
+  if(length(allSame)>0){
+    namesToRemoveNoVar = names(survivalDataset)[allSame]
+    survivalDataset = survivalDataset[,-allSame]
+    warning(paste("The variable(s)",paste(namesToRemoveNoVar, collapse = ", "),"contained only 1 unique value. They have been removed.",
+                  sep = " "))
+  }
   #Remove columns with over 25% of data missing.
   naProp = apply(survivalDataset, 2, function(x) sum(is.na(x))/nrow(survivalDataset))
-  toRemove = which(naProp > 0.25) 
-  if(length(toRemove)>0){
-    namesToRemove = names(survivalDataset)[toRemove]
-    survivalDataset = survivalDataset[,-toRemove]
-    warning(paste("The variable(s)",paste(namesToRemove, collapse = ", "),"contained over 25% NA values. They have been removed.", sep = " "))
+  toRemoveNA = which(naProp > 0.25)
+  if(length(toRemoveNA)>0){
+    namesToRemoveNA = names(survivalDataset)[toRemoveNA]
+    survivalDataset = survivalDataset[,-toRemoveNA]
+    warning(paste("The variable(s)",paste(namesToRemoveNA, collapse = ", "),"contained over 25% NA values. They have been removed.",
+                  sep = " "))
   }
   return(survivalDataset)
 }
