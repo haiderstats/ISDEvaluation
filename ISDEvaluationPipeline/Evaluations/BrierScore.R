@@ -56,6 +56,10 @@ singleBrier = function(survMod, BrierTime = NULL){
       BrierTime = (-0.5)/slope
     })
   }
+  if(is.na(BrierTime)){
+    slope = (1-min(KMCurve$surv))/(0 - max(KMCurve$time))
+    BrierTime = (-0.5)/slope
+  }
   inverseCensorTrain = 1 - trainingCensorStatus
   invProbCensor = prodlim(Surv(trainingEventTimes,inverseCensorTrain)~1)
   #Here we are ordering event times and then using predict with level.chaos = 1 which returns predictions ordered by time.
