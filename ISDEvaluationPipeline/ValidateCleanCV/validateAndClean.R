@@ -46,6 +46,11 @@ validate = function(survivalDataset){
     InftimeIndex = which(is.infinite(survivalDataset$time))
     survivalDataset = survivalDataset[-InftimeIndex,]
   }
+  if(any(survivalDataset$time <=0)){
+    warning("'time' includes non-positive values. These rows have been removed.")
+    nonPosTimeIndex = which(survivalDataset$time <=0)
+    survivalDataset = survivalDataset[-nonPosTimeIndex,]
+  }
   if(any(is.na(survivalDataset$delta))){
     warning("'delta' includes NA values. These rows have been removed.")
     NAdeltaIndex = which(is.na(survivalDataset$delta))
