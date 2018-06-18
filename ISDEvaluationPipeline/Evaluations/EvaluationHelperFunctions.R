@@ -34,6 +34,11 @@ predictProbabilityFromCurve = function(survivalCurve,predictedTimes, timeToPredi
 
 #We calculate the mean and median survival times assuming a monotone spline fit of the survival curve points.
 predictMeanSurvivalTimeSpline = function(survivalCurve, predictedTimes){
+  #If all the predicted probabilities are 1 the integral will be infinite. For this reason we slightly decrease the 
+  #last value.
+  if(all(survivalCurve==1)){
+    survivalCurve[length(survivalCurve)] = 1 - 1e-5
+  }
   spline = splinefun(predictedTimes, survivalCurve, method = "hyman")
   maxTime = max(predictedTimes)
   slope = (1-spline(maxTime))/(0 - max(predictedTimes))
@@ -44,6 +49,11 @@ predictMeanSurvivalTimeSpline = function(survivalCurve, predictedTimes){
 }
 
 predictMedianSurvivalTimeSpline = function(survivalCurve, predictedTimes){
+  #If all the predicted probabilities are 1 the integral will be infinite. For this reason we slightly decrease the 
+  #last value.
+  if(all(survivalCurve==1)){
+    survivalCurve[length(survivalCurve)] = 1 - 1e-5
+  }
   spline = splinefun(predictedTimes, survivalCurve, method = "hyman")
   minProb = min(spline(predictedTimes))
   if(minProb < .5){
