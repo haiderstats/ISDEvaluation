@@ -87,6 +87,12 @@ OneCalibrationCumulative = function(listOfSurvivalModels, timeOfInterest = NULL,
       timeOfInterest = (-0.5)/slope
     })
   }
+  #Additionally sometimes the quantile function will return NA instead of an error if it still able to produce a lower bound. Here we 
+  #do the same thing as above when we catch the error.
+  if(is.na(timeOfInterest)){
+    slope = (1-min(KMCurve$surv))/(0 - max(KMCurve$time))
+    timeOfInterest = (-0.5)/slope
+  }
   predictions = unlist(lapply(seq_along(listOfSurvivalModels), function(model) lapply(seq_along(trueDeathTimes[[model]]),
                               function(index) predictProbabilityFromCurve(survivalCurves[[model]][,index],
                                                                           predictedTimes[[model]],
