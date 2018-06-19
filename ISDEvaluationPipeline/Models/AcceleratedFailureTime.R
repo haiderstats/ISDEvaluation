@@ -20,7 +20,21 @@
 library(survival)
 
 AFT = function(training, testing, AFTDistribution){
-  aftMod = survreg(Surv(time,delta)~., data = training, dist = AFTDistribution)
+  withCallingHandlers({
+    withRestarts({
+      aftMod = survreg(Surv(time,delta)~., data = training, dist = AFTDistribution)
+    }, returnNull =function() {
+      return(NULL)
+    })},
+    warning = function(w){
+      if(grepl("did not converge", w$message)){
+        invokeRestart("returnNull")
+      } else {
+        message(w$message)
+      }
+    })
+  if(is.null(aftMod))
+    return(NULL)
   trainingTimes = sort(unique(training$time))
   if(0 %in% trainingTimes){
     timesToPredict = trainingTimes
