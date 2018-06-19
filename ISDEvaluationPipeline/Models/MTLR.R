@@ -47,8 +47,8 @@ MTLR = function(training, testing){
   #the first 4 columns are the true time of death, 1- censoring status, and 2 different averaged survival times.
   trueDeathTimes = testingPoints[,1]
   censorStatus = 1 -testingPoints[,2]
-  #We don't want the averages and the last column is some evaluation of survival probability at the true time of death. We will 
-  #discard this since later on we have a method used for every survival curve. Further we minus 1 because we dont want to include the 
+  #We don't want the averages (first 3 columns) and the last column is some evaluation of survival probability at the true time of death.
+  #We will discard this since later on we have a method used for every survival curve. Further we minus 1 because we dont want to include the 
   #0th time point. So we have ignore first 4 columns through the number of time points, subtracting 1 for the 0th time point.
   survivalProbabilities = testingPoints[5:(4+length(timePoints)-1)]
   #Survival probabilities were read in a factors and contain commas. We will clean this out by turning them into character vectors and 
