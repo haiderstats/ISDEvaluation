@@ -121,11 +121,11 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     }
     if(Brier){
       print("Staring Evaluation: Brier Score")
-      coxBrierInt = BrierScore(coxMod, type = "Integrated", numBrierPoints)
-      kmBrierInt = BrierScore(kmMod, type = "Integrated", numBrierPoints)
-      rsfBrierInt = BrierScore(rsfMod, type = "Integrated", numBrierPoints)
-      aftBrierInt = BrierScore(aftMod, type = "Integrated", numBrierPoints)
-      mtlrBrierInt = BrierScore(mtlrMod, type = "Integrated", numBrierPoints)
+      coxBrierInt = BrierScore(coxMod, type = "Integrated", numPoints = numBrierPoints)
+      kmBrierInt = BrierScore(kmMod, type = "Integrated", numPoints = numBrierPoints)
+      rsfBrierInt = BrierScore(rsfMod, type = "Integrated",numPoints =  numBrierPoints)
+      aftBrierInt = BrierScore(aftMod, type = "Integrated", numPoints = numBrierPoints)
+      mtlrBrierInt = BrierScore(mtlrMod, type = "Integrated", numPoints =  numBrierPoints)
       
       coxBrierS = BrierScore(coxMod, type = "Single",singleTime = BrierTime)
       kmBrierS = BrierScore(kmMod, type = "Single",singleTime = BrierTime)
@@ -178,8 +178,13 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     
     OneCalCumResults = c(coxCum1cal, kmCum1cal, rsfCum1cal, aftCum1cal, mtlrCum1cal)
     evaluationResults$OneCalCumResults = rep(OneCalCumResults, numberOfFolds)
-    
   }
+  #We will add some basic information about the dataset.
+  evaluationResults$N = nrow(validatedData)
+  #Note we subtract 2 to not count `time` and `delta`.
+  evaluationResults$NumFeatures = ncol(validatedData) - 2
+  evaluationResults$NumFeaturesOneHot = ncol(training) - 2
+  evaluationResults$PercentCensored = sum(validatedData$delta)/nrow(validatedData)
   return(evaluationResults)
 }
 
