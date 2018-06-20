@@ -82,8 +82,8 @@ Concordance = function(survMod, ties = "None",includeCensored =F){
         s2 = KMLinearPredict(sortedDeathTimes[toCompare])
         s1 = rep(KMLinearPredict(sortedDeathTimes[rowIndex]), length(toCompare))
         greaterProb = ifelse(uncensoredInd,1-(s2/s1),1 - 0.5*(s2/s1))
-        #If KMLinearPredict evaluates to 0 then the greater probability should be 1 - they should both already be dead anyway.
-        greaterProb = ifelse(is.nan(greaterProb),1,0)
+        #If s1 evaluates to 0 then the greater probability should be 1 - they should both already be dead anyway.
+        greaterProb = ifelse(is.nan(greaterProb),1,greaterProb)
         predictedProb = ifelse(averageSurvivalTimes[orderDeathTimes][rowIndex] <= averageSurvivalTimes[orderDeathTimes][toCompare],
                                greaterProb,1-greaterProb)
         x[toCompare-1] = predictedProb
