@@ -20,6 +20,7 @@
 library(survival)
 
 AFT = function(training, testing, AFTDistribution){
+  aftMod = NA
   withCallingHandlers({
     withRestarts({
       aftMod = survreg(Surv(time,delta)~., data = training, dist = AFTDistribution)
@@ -33,8 +34,8 @@ AFT = function(training, testing, AFTDistribution){
         message(w$message)
       }
     })
-  if(is.null(aftMod))
-    return(NULL)
+  if(is.na(aftMod))
+    return(NA)
   trainingTimes = sort(unique(training$time))
   if(0 %in% trainingTimes){
     timesToPredict = trainingTimes
