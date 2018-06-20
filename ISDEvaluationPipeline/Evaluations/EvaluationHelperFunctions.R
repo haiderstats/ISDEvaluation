@@ -37,7 +37,7 @@ predictMeanSurvivalTimeSpline = function(survivalCurve, predictedTimes){
   #If all the predicted probabilities are 1 the integral will be infinite. For this reason we slightly decrease the 
   #last value.
   if(all(survivalCurve==1)){
-    survivalCurve[length(survivalCurve)] = 1 - 1e-5
+    return(Inf)
   }
   spline = splinefun(predictedTimes, survivalCurve, method = "hyman")
   maxTime = max(predictedTimes)
@@ -52,7 +52,7 @@ predictMedianSurvivalTimeSpline = function(survivalCurve, predictedTimes){
   #If all the predicted probabilities are 1 the integral will be infinite. For this reason we slightly decrease the 
   #last value.
   if(all(survivalCurve==1)){
-    survivalCurve[length(survivalCurve)] = 1 - 1e-5
+    return(Inf)
   }
   spline = splinefun(predictedTimes, survivalCurve, method = "hyman")
   minProb = min(spline(predictedTimes))
