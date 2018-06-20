@@ -145,9 +145,9 @@ normalizeVariables = function(listOfImputedDatasets, numberOfFolds){
     #and remove them for every fold.
     namesWithCommas = which(grepl(",",names(listOfImputedDatasets$Training[[i]])))
     if(length(namesWithCommas) > 0){
-      names(listOfImputedDatasets$Training[[i]])[namesWithCommas] = sub(",","COMMA",
+      names(listOfImputedDatasets$Training[[i]])[namesWithCommas] = gsub(",","COMMA",
                                                                         names(listOfImputedDatasets$Training[[i]])[namesWithCommas])
-      names(listOfImputedDatasets$Testing[[i]])[namesWithCommas] = sub(",","COMMA",
+      names(listOfImputedDatasets$Testing[[i]])[namesWithCommas] = gsub(",","COMMA",
                                                                         names(listOfImputedDatasets$Testing[[i]])[namesWithCommas])
     }
   }
