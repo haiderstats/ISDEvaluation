@@ -17,23 +17,7 @@
 library(survival)
 
 CoxPH_KP = function(training, testing){
-  coxMod = NA
-  withCallingHandlers({
-    withRestarts({
-      coxMod = coxph(Surv(time,delta)~., data = training)
-    }, returnNull =function() {
-      return(NULL)
-    })},
-    warning = function(w){
-      if(grepl("did not converge", w$message)){
-        invokeRestart("returnNull")
-      } else {
-        print(w)
-        message(w$message)
-      }
-    })
-  if(is.na(coxMod))
-    return(NA)
+  coxMod = coxph(Surv(time,delta)~., data = training)
   survivalCurves = survfit(coxMod, testing, type = "kalbfleisch-prentice")
   if(0 %in% survivalCurves$time){
     timePoints = survivalCurves$time
