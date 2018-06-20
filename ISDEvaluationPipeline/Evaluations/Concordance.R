@@ -36,7 +36,7 @@ Concordance = function(survMod, ties = "None",includeCensored =F){
   #Being passed an empty model.
   if(is.null(survMod)) return(NULL)
   #Being passed a model that failed.
-  if(is.na(survMod[[1]])) return(NA)
+  suppressWarnings(if(is.na(survMod[[1]])) return(NA))
   if(!ties %in% c("None","Risk","Time","All"))
     stop("Please enter one of: 'None', 'Risk','Time', or 'All' as the ties argument.")
   predictedTimes = survMod[[1]][,1]

@@ -32,7 +32,7 @@ DCalibration = function(survMod, numBins){
   #Being passed an empty model.
   if(is.null(survMod)) return(NULL)
   #Being passed a model that failed.
-  if(is.na(survMod[[1]])) return(NA) 
+  suppressWarnings(if(is.na(survMod[[1]])) return(NA))
   combinedBins = getBinned(survMod, numBins)
   pvalue = chisq.test(combinedBins)$p.value
   return(pvalue)
@@ -40,7 +40,7 @@ DCalibration = function(survMod, numBins){
 
 DCalibrationCumulative = function(listOfSurvivalModels, numBins){
   if(length(listOfSurvivalModels) == 0) return(NULL)
-  if(any(unlist(lapply(listOfSurvivalModels, is.na)))) return(NA)
+  suppressWarnings(if(any(unlist(lapply(listOfSurvivalModels, is.na)))) return(NA))
   #Here we apply getBinned to every survival model, stack the bins into a matrix, and sum the columns to get the total bin values.
   combinedBins =colSums(ldply(lapply(seq_along(listOfSurvivalModels), function(x) getBinned(listOfSurvivalModels[[x]], numBins)), rbind))
   pvalue = chisq.test(combinedBins)$p.value
