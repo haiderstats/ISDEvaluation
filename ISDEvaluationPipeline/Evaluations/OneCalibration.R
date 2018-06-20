@@ -178,7 +178,7 @@ binItUp = function(trueDeathTimes,censorStatus, predictions, type, numBuckets,ti
                                                      predict(prodlim(Surv(time, delta)~1),timeOfInterest)))
                   observed = numDied$deadCount
                   expected = 1-bucketSurvival$survivalPrediction
-                  HLStat = (bucketSizes*(observed-expected)^2)/((1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction)
+                  HLStat = (bucketSizes[bucketSizes!=0]*(observed-expected)^2)/((1-bucketSurvival$survivalPrediction)*bucketSurvival$survivalPrediction)
                   HLStat = sum(ifelse(is.nan(HLStat),0,HLStat))
                   #See comments in file header for reasoning of degree of freedom choice.
                   DoF = ifelse(numBuckets > 15, numBuckets -2, numBuckets-1)
