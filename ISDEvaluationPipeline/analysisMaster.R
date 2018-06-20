@@ -184,7 +184,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
   #Note we subtract 2 to not count `time` and `delta`.
   evaluationResults$NumFeatures = ncol(validatedData) - 2
   evaluationResults$NumFeaturesOneHot = ncol(training) - 2
-  evaluationResults$PercentCensored = sum(validatedData$delta)/nrow(validatedData)
+  evaluationResults$PercentCensored = sum(!validatedData$delta)/nrow(validatedData)
   return(evaluationResults)
 }
 
