@@ -40,7 +40,7 @@ source("Evaluations/BrierScore.R")
 analysisMaster = function(survivalDataset, numberOfFolds,
                           CoxKP = T, KaplanMeier = T, RSFModel = T, AFTModel = T, MTLRModel =T, #Models
                           DCal = T, OneCal = T, Concor = T, L1Measure = T, Brier = T, #Evaluations
-                          DCalBins = 10, OneCalTime = NULL,  concordanceTies = "None", #Evaluation args
+                          DCalBins = 10, OneCalTime = NULL,  concordanceTies = "Risk", #Evaluation args
                           BrierTime = NULL, numBrierPoints = 1000, Ltype = "Margin", Llog = F, #Evaluation args
                           typeOneCal = "BucketKM", oneCalBuckets = 10, #Evaluation args
                           AFTDistribution = "weibull", ntree = 1000 #Model args
