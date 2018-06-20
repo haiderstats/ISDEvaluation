@@ -33,7 +33,10 @@ source("Evaluations/EvaluationHelperFunctions.R")
 #add in the censored piece from part 2 if includeCensored == True. Additionally, this is were tied data is handled.
 Concordance = function(survMod, ties = "None",includeCensored =F){
   #Part 1:
+  #Being passed an empty model.
   if(is.null(survMod)) return(NULL)
+  #Being passed a model that failed.
+  if(is.na(survMod[[1]])) return(NA)
   if(!ties %in% c("None","Risk","Time","All"))
     stop("Please enter one of: 'None', 'Risk','Time', or 'All' as the ties argument.")
   predictedTimes = survMod[[1]][,1]
@@ -79,6 +82,8 @@ Concordance = function(survMod, ties = "None",includeCensored =F){
         s2 = KMLinearPredict(sortedDeathTimes[toCompare])
         s1 = rep(KMLinearPredict(sortedDeathTimes[rowIndex]), length(toCompare))
         greaterProb = ifelse(uncensoredInd,1-(s2/s1),1 - 0.5*(s2/s1))
+        #If KMLinearPredict evaluates to 0 then the greater probability should be 1 - they should both already be dead anyway.
+        greaterProb = ifelse(is.nan(greaterProb),1,0)
         predictedProb = ifelse(averageSurvivalTimes[orderDeathTimes][rowIndex] <= averageSurvivalTimes[orderDeathTimes][toCompare],
                                greaterProb,1-greaterProb)
         x[toCompare-1] = predictedProb

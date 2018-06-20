@@ -21,7 +21,10 @@ library(plyr)
 source("Evaluations/EvaluationHelperFunctions.R")
 
 L1 = function(survMod, type = "Uncensored", logScale = F){
+  #Being passed an empty model.
   if(is.null(survMod)) return(NULL)
+  #Being passed a model that failed.
+  if(is.na(survMod[1])) return(NA)
   predictedTimes = survMod[[1]]$time
   survivalCurves = survMod[[1]][-1]
   trueDeathTimes = survMod[[2]]$time
@@ -65,6 +68,7 @@ L1 = function(survMod, type = "Uncensored", logScale = F){
                               function(time) time + integrate(KMLinearPredict,
                                                               lower = time, 
                                                               upper = KMLinearZero,subdivisions = 2000,rel.tol = .01)[[1]]/KMLinearPredict(time)))
+                       bestGuess = ifelse(is.nan(bestGuess),0,bestGuess)
                        weights = 1- KMLinearPredict(censorTimes)
                        marginPiece = ifelse(!logScale,
                                             sum(weights*(abs(bestGuess - averageCensored))),

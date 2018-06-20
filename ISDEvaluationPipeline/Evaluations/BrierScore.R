@@ -28,7 +28,10 @@ library(prodlim)
 source("Evaluations/EvaluationHelperFunctions.R")
 
 BrierScore = function(survMod, type = "Integrated", singleTime = NULL, integratedTimes = NULL, numPoints=NULL){
+  #Being passed an empty model.
   if(is.null(survMod)) return(NULL)
+  #Being passed a model that failed.
+  if(is.na(survMod[1])) return(NA)
   if(type == "Integrated" & is.null(integratedTimes))
     integratedTimes = c(0, max(c(survMod[[2]]$time, survMod[[3]]$time))) #max time of the training and testing set 
                                                                          #combined (the entire dataset).
