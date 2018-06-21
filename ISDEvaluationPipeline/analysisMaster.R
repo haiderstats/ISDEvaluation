@@ -46,14 +46,17 @@ analysisMaster = function(survivalDataset, numberOfFolds,
                           AFTDistribution = "weibull", ntree = 1000 #Model args
                           ){
   validatedData = validateAndClean(survivalDataset)
-  normalizedData = createFoldsAndNormalize(validatedData, numberOfFolds)
+  foldsAndNormalizedData = createFoldsAndNormalize(validatedData, numberOfFolds)
+  originalIndexing = foldsAndNormalizedData[[1]]
+  normalizedData = foldsAndNormalizedData[[2]]
   evaluationResults = data.frame()
   combinedTestResults = list(Cox = list(), KM = list(), AFT = list(), RSF = list(), MTLR = list())
+  coxTimes = NULL; kmTimes = NULL; rsfTimes = NULL; aftTimes = NULL; mtlrTimes = NULL;
   for(i in 1:numberOfFolds){
     print(Sys.time())
     print(paste("Starting fold",i,"of", numberOfFolds, "total folds."))
     #Models - We evaluate values to NULL so we can pass them to evaluations, regardless if the models were ran or not.
-    coxMod = NULL; kmMod = NULL; rsfMod = NULL; aftMod = NULL; MTLRMod = NULL;
+    coxMod = NULL; kmMod = NULL; rsfMod = NULL; aftMod = NULL; mtlrMod = NULL;
     training = normalizedData[[1]][[i]]
     testing = normalizedData[[2]][[i]]
     print(paste("Beginning model training."))
@@ -61,29 +64,35 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       print("Starting Cox Proportional Hazards.")
       coxMod = CoxPH_KP(training, testing)
       combinedTestResults$Cox[[i]] = coxMod
+      coxTimes = c(coxTimes,coxMod[[1]]$time)
     }
     if(KaplanMeier){
       print("Starting Kaplan Meier.")
       kmMod = KM(training, testing)
       combinedTestResults$KM[[i]] = kmMod
+      kmTimes = c(kmTimes,kmMod[[1]]$time)
     }
     if(RSFModel){
       print("Starting Random Survival Forests.")
       rsfMod = RSF(training, testing,ntree = ntree)
       combinedTestResults$RSF[[i]] = rsfMod
+      rsfTimes = c(rsfTimes,rsfMod[[1]]$time)
     }
     if(AFTModel){
       print("Starting Accelerated Failure Time.")
       aftMod = AFT(training, testing, AFTDistribution)
       combinedTestResults$AFT[[i]] = aftMod
+      aftTimes = c(aftTimes,aftMod[[1]]$time)
     }
     if(MTLRModel){
       print("Starting Multi-task Logistic Regression (PSSP).")
       mtlrMod = MTLR(training, testing)
       combinedTestResults$MTLR[[i]] = mtlrMod
+      mtlrTimes = c(mtlrTimes,mtlrMod[[1]]$time)
     }
     #Evaluations - Note that if evaluations are passed a NULL value they return a NULL.
-    DCalResults = NULL;OneCalResults = NULL;ConcResults = NULL;BrierResults = NULL;L1Results = NULL; L2Results = NULL; 
+    DCalResults = NULL;OneCalResults = NULL;ConcCensResults = NULL;ConcUncensResults = NULL;
+    BrierResultsInt = NULL;BrierResultsSingle = NULL;L1Results = NULL; L2Results = NULL; 
     if(DCal){
       print("Staring Evaluation: D-Calibration")
       coxDcal = DCalibration(coxMod, DCalBins)
@@ -185,12 +194,68 @@ analysisMaster = function(survivalDataset, numberOfFolds,
   evaluationResults$NumFeatures = ncol(validatedData) - 2
   evaluationResults$NumFeaturesOneHot = ncol(training) - 2
   evaluationResults$PercentCensored = sum(!validatedData$delta)/nrow(validatedData)
-  return(evaluationResults)
+  survivalCurves = getSurvivalCurves(coxTimes, kmTimes, aftTimes, rsfTimes, mtlrTimes,
+                                     CoxKP, KaplanMeier, RSFModel, AFTModel, MTLRModel,
+                                     combinedTestResults, numberOfFolds,originalIndexing)
+  names(survivalCurves) = models
+  return(list(datasetUsed = validatedData, survivalCurves = survivalCurves, results = evaluationResults))
 }
 
 
 
 
+getSurvivalCurves = function(coxTimes, kmTimes, aftTimes, rsfTimes, mtlrTimes,
+                             CoxKP = T, KaplanMeier = T, RSFModel = T, AFTModel = T, MTLRModel =T,
+                             combinedTestResults, numberOfFolds, originalIndexing){
+  originalIndexOrder = order(unname(unlist(originalIndexing)))
+  if(!is.null(coxTimes))
+    coxTimes = sort(unique(coxTimes))
+  if(!is.null(kmTimes))
+    kmTimes = sort(unique(kmTimes))
+  if(!is.null(rsfTimes))
+    rsfTimes = sort(unique(rsfTimes))
+  if(!is.null(aftTimes))
+    aftTimes = sort(unique(aftTimes))
+  if(!is.null(mtlrTimes))
+    mtlrTimes = sort(unique(mtlrTimes))
+  models = c(CoxKP, KaplanMeier, AFTModel,RSFModel,MTLRModel)
+  allTimes = list(coxTimes,kmTimes,aftTimes,rsfTimes,mtlrTimes)
+  survivalCurves = list()
+  count = 0
+  for(j in which(models)){
+    count =count+1
+    fullCurves = data.frame(row.names = 1:length(allTimes[[j]]))
+    for(i in 1:numberOfFolds){
+      #Index method -> fold -> survival curves
+      times = combinedTestResults[[j]][[i]][[1]]$time
+      maxTime = max(times)
+      curves  = combinedTestResults[[j]][[i]][[1]][,-1]
+      timesToEvaluate = setdiff(allTimes[[j]],times)
+      fullCurves = cbind.data.frame(fullCurves,sapply(curves,
+                                                      function(x){
+                                                        curveSpline = splinefun(times,x,method='hyman')
+                                                        maxSpline = curveSpline(maxTime)
+                                                        curveSplineConstant = function(time){
+                                                          time = ifelse(time > maxTime, maxTime,time)
+                                                          return(curveSpline(time))
+                                                        }
+                                                        extraPoints =curveSplineConstant(timesToEvaluate)
+                                                        toReturn = rep(NA, length(allTimes[[j]]))
+                                                        originalIndex = which(!allTimes[[j]] %in% timesToEvaluate)
+                                                        newIndex = which(allTimes[[j]] %in% timesToEvaluate)
+                                                        toReturn[originalIndex] = x
+                                                        toReturn[newIndex] = extraPoints
+                                                        return(toReturn)
+                                                      }
+      ))
+    }
+    fullCurves = cbind.data.frame(allTimes[j], fullCurves)
+    fullCurves[originalIndexOrder]
+    colnames(fullCurves) = c("time",1:(ncol(fullCurves)-1))
+    survivalCurves[[count]] = fullCurves
+  }
+  return(survivalCurves)
+}
 
 
 
