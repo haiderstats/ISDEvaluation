@@ -36,10 +36,12 @@ library(caret)
 
 #Functions:
 createFoldsAndNormalize = function(survivalDataset, numberOfFolds){
-  listOfDatasets = createFoldsOfData(survivalDataset, numberOfFolds)
+  folds = createFoldsOfData(survivalDataset, numberOfFolds)
+  originalIndexing = folds[[1]]
+  listOfDatasets = folds[[2]]
   listOfImputedDatasets = meanImputation(listOfDatasets, numberOfFolds)
   listOfNormalizedDatasets = normalizeVariables(listOfImputedDatasets, numberOfFolds)
-  return(listOfNormalizedDatasets)
+  return(list(originalIndexing, listOfNormalizedDatasets))
 }
 
 createFoldsOfData = function(survivalDataset, numberOfFolds){
@@ -48,7 +50,7 @@ createFoldsOfData = function(survivalDataset, numberOfFolds){
   listOfTestingSets = lapply(foldIndex, function(indexs) survivalDataset[indexs,])
   listOfTrainingSets = lapply(foldIndex, function(indexs) survivalDataset[-indexs,])
   listOfDatasets = list(Training = listOfTrainingSets, Testing = listOfTestingSets)
-  return(listOfDatasets)
+  return(list(foldIndex,listOfDatasets))
 }
 
 meanImputation = function(listOfDatasets, numberOfFolds){
