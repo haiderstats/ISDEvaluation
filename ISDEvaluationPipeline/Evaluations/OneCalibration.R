@@ -67,7 +67,7 @@ OneCalibration = function(survMod, timeOfInterest = NULL, type = "BucketKM", num
 }
 
 OneCalibrationCumulative = function(listOfSurvivalModels, timeOfInterest = NULL, type = "BucketKM", numBuckets = 10){
-  if(is.null(listOfSurvivalModels)) return(NULL)
+  if(length(listOfSurvivalModels) ==0) return(NULL)
   suppressWarnings(if(any(unlist(lapply(listOfSurvivalModels, is.na)))) return(NA))
   if(!type %in% c("Uncensored","Fractional","BucketKM"))
     stop("Please enter one of 'Uncensored','Fractional','BucketKM' for type.")
