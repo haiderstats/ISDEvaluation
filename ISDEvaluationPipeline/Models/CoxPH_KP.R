@@ -18,6 +18,11 @@ library(survival)
 
 CoxPH_KP = function(training, testing){
   coxMod = coxph(Surv(time,delta)~., data = training)
+  if(!exists("coxMod")){
+    CoxKP <<- FALSE
+    warning("Cox-PH failed to converge (likely due to singularity). Future runs have been eliminated for Cox.")
+    return(NA)
+  }
   survivalCurves = survfit(coxMod, testing, type = "kalbfleisch-prentice")
   if(0 %in% survivalCurves$time){
     timePoints = survivalCurves$time

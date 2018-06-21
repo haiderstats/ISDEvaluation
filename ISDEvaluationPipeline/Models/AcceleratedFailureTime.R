@@ -21,6 +21,11 @@ library(survival)
 
 AFT = function(training, testing, AFTDistribution){
   aftMod = survreg(Surv(time,delta)~., data = training, dist = AFTDistribution)
+  if(!exists("aftMod")){
+    AFTModel <<- FALSE
+    warning("AFT failed to converge (likely due to singularity). Future runs have been eliminated for AFT.")
+    return(NA)
+  }
   trainingTimes = sort(unique(training$time))
   if(0 %in% trainingTimes){
     timesToPredict = trainingTimes
