@@ -24,7 +24,7 @@ L1 = function(survMod, type = "Uncensored", logScale = F){
   #Being passed an empty model.
   if(is.null(survMod)) return(NULL)
   #Being passed a model that failed.
-  suppressWarnings(if(is.na(survMod[[1]])) return(NA))
+  suppressWarnings(if(is.na(survMod[[1]])) return(NULL))
   predictedTimes = survMod[[1]]$time
   survivalCurves = survMod[[1]][-1]
   trueDeathTimes = survMod[[2]]$time

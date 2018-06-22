@@ -30,7 +30,7 @@ OneCalibration = function(survMod, timeOfInterest = NULL, type = "BucketKM", num
   #Being passed an empty model.
   if(is.null(survMod)) return(NULL)
   #Being passed a model that failed.
-  suppressWarnings(if(is.na(survMod[[1]])) return(NA))
+  suppressWarnings(if(is.na(survMod[[1]])) return(NULL))
   if(!type %in% c("Uncensored","Fractional","BucketKM"))
     stop("Please enter one of 'Uncensored','Fractional','BucketKM' for type.")
   predictedTimes = survMod[[1]]$time

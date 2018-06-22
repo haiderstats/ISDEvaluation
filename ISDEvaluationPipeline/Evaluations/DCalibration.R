@@ -32,7 +32,7 @@ DCalibration = function(survMod, numBins){
   #Being passed an empty model.
   if(is.null(survMod)) return(NULL)
   #Being passed a model that failed.
-  suppressWarnings(if(is.na(survMod[[1]])) return(NA))
+  suppressWarnings(if(is.na(survMod[[1]])) return(NULL))
   combinedBins = getBinned(survMod, numBins)
   pvalue = chisq.test(combinedBins)$p.value
   return(pvalue)
