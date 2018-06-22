@@ -20,10 +20,14 @@
 library(survival)
 
 AFT = function(training, testing, AFTDistribution){
-  aftMod = survreg(Surv(time,delta)~., data = training, dist = AFTDistribution)
-  if(!exists("aftMod")){
-    AFTModel <<- FALSE
+  tryCatch({
+    aftMod = survreg(Surv(time,delta)~., data = training, dist = AFTDistribution)
+  },
+  error = function(e) {
+    message(e)
     warning("AFT failed to converge (likely due to singularity). Future runs have been eliminated for AFT.")
+  })
+  if(!exists("aftMod")){
     return(NA)
   }
   trainingTimes = sort(unique(training$time))
@@ -59,7 +63,7 @@ survfunc = function (object, t, newdata, name = "t") {
   lp <- predict(object, newdata = newdata, type = "lp")
   if (object$dist %in% c("weibull", "exponential")) {
     newdata$pdf <- dweibull(t, 1/object$scale, exp(lp))
-    newdata$cdf <- pweibull(t, 1/object$scale, exp(lp))
+    newdata$cdf <- ifelse(is.nan(pweibull(t, 1/object$scale, exp(lp))),1,pweibull(t, 1/object$scale, exp(lp)))
     newdata$haz <- exp(dweibull(t, 1/object$scale, exp(lp), 
                                 log = TRUE) - pweibull(t, 1/object$scale, exp(lp), 
                                                        lower.tail = FALSE, log.p = TRUE))
