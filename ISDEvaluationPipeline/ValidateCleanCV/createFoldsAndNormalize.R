@@ -45,8 +45,13 @@ createFoldsAndNormalize = function(survivalDataset, numberOfFolds){
 }
 
 createFoldsOfData = function(survivalDataset, numberOfFolds){
-  #Create folds with the equal amounts of censoring.
-  foldIndex = createFolds(as.factor(survivalDataset$delta), k = numberOfFolds, list = TRUE)
+  #Create folds with the equal amounts of censoring and quasi equal ranges. Here we order by censor status and time to event
+  #and then match these off to folds one by one. Doing it this way makes cross validation deterministic which is not ideal
+  #but lets us have equally matched folds.
+  time = survivalDataset$time
+  delta = survivalDataset$delta
+  Order= order(delta,time)
+  foldIndex = lapply(1:numberOfFolds, function(x) Order[seq(x,nrow(survivalDataset), by = numberOfFolds)])
   listOfTestingSets = lapply(foldIndex, function(indexs) survivalDataset[indexs,])
   listOfTrainingSets = lapply(foldIndex, function(indexs) survivalDataset[-indexs,])
   listOfDatasets = list(Training = listOfTrainingSets, Testing = listOfTestingSets)
