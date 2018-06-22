@@ -27,9 +27,6 @@ source("Models/RandomSurvivalForests.R")
 source("Models/AcceleratedFailureTime.R")
 source("Models/MTLR.R")
 
-#As of May 26, I'm not sure if PSSP has an R implementation or if it is in some other language.
-#We will leave a commented out R file for now.
-#source("Models/PSSP.R")
 #Evaluation files:
 source("Evaluations/DCalibration.R")
 source("Evaluations/OneCalibration.R")
@@ -37,15 +34,21 @@ source("Evaluations/Concordance.R")
 source("Evaluations/L1Measures.R")
 source("Evaluations/BrierScore.R")
 
+#Misc files:
+source("FeatureSelection/FeatureSelection.R")
+
 analysisMaster = function(survivalDataset, numberOfFolds,
                           CoxKP = T, KaplanMeier = T, RSFModel = T, AFTModel = T, MTLRModel =T, #Models
                           DCal = T, OneCal = T, Concor = T, L1Measure = T, Brier = T, #Evaluations
                           DCalBins = 10, OneCalTime = NULL,  concordanceTies = "Risk", #Evaluation args
                           BrierTime = NULL, numBrierPoints = 1000, Ltype = "Margin", Llog = F, #Evaluation args
                           typeOneCal = "BucketKM", oneCalBuckets = 10, #Evaluation args
-                          AFTDistribution = "weibull", ntree = 1000 #Model args
+                          AFTDistribution = "weibull", ntree = 1000, #Model args,
+                          FeatureSelection = T # Misc args
                           ){
   validatedData = validateAndClean(survivalDataset)
+  if(FeatureSelection)
+    validatedData = FeatureSelection(validatedData, type = "UniCox")
   foldsAndNormalizedData = createFoldsAndNormalize(validatedData, numberOfFolds)
   originalIndexing = foldsAndNormalizedData[[1]]
   normalizedData = foldsAndNormalizedData[[2]]
@@ -63,8 +66,15 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     if(CoxKP){
       print("Starting Cox Proportional Hazards.")
       coxMod = CoxPH_KP(training, testing)
-      combinedTestResults$Cox[[i]] = coxMod
-      coxTimes = c(coxTimes,coxMod[[1]]$time)
+      if(length(coxMod) ==1){
+        combinedTestResults$Cox = list()
+        coxTimes = NULL
+        CoxKP = F
+      }
+      else{
+        combinedTestResults$Cox[[i]] = coxMod
+        coxTimes = c(coxTimes,coxMod[[1]]$time)
+      }
     }
     if(KaplanMeier){
       print("Starting Kaplan Meier.")
@@ -81,8 +91,15 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     if(AFTModel){
       print("Starting Accelerated Failure Time.")
       aftMod = AFT(training, testing, AFTDistribution)
-      combinedTestResults$AFT[[i]] = aftMod
-      aftTimes = c(aftTimes,aftMod[[1]]$time)
+      if(length(aftMod)==1){
+          combinedTestResults$AFT = list()
+          aftTimes = NULL
+          AFTModel = F
+        }
+      else{
+          combinedTestResults$AFT[[i]] = aftMod
+          aftTimes = c(aftTimes,aftMod[[1]]$time)
+      }
     }
     if(MTLRModel){
       print("Starting Multi-task Logistic Regression (PSSP).")
