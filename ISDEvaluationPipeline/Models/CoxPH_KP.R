@@ -17,13 +17,17 @@
 library(survival)
 
 CoxPH_KP = function(training, testing){
-  coxMod = coxph(Surv(time,delta)~., data = training)
-  if(!exists("coxMod")){
-    CoxKP <<- FALSE
+  tryCatch({
+    coxModel = coxph(Surv(time,delta)~., data = training,singular.ok = T)
+  },
+  error = function(e) {
+    message(e)
     warning("Cox-PH failed to converge (likely due to singularity). Future runs have been eliminated for Cox.")
+  })
+  if(!exists("coxModel")){
     return(NA)
   }
-  survivalCurves = survfit(coxMod, testing, type = "kalbfleisch-prentice")
+  survivalCurves = survfit(coxModel, testing, type = "kalbfleisch-prentice")
   if(0 %in% survivalCurves$time){
     timePoints = survivalCurves$time
     probabilities = survivalCurves$surv
