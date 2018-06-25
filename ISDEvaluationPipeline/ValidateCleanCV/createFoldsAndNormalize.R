@@ -119,7 +119,7 @@ meanImputation = function(listOfDatasets, numberOfFolds){
 }
 
 normalizeVariables = function(listOfImputedDatasets, numberOfFolds){
-  listOfNormalizedDataset = list()
+  listOfNormalizedDatasets = list()
   for(i in 1:numberOfFolds){
     train = listOfImputedDatasets$Training[[i]]
     test = listOfImputedDatasets$Testing[[i]]
@@ -147,22 +147,18 @@ normalizeVariables = function(listOfImputedDatasets, numberOfFolds){
       return(x)
     })
 
-    listOfNormalizedDataset$Training[[i]] = as.data.frame(trainCentered)
-    listOfNormalizedDataset$Testing[[i]] = as.data.frame(testCentered)
-    }
+    listOfNormalizedDatasets$Training[[i]] = as.data.frame(trainCentered)
+    listOfNormalizedDatasets$Testing[[i]] = as.data.frame(testCentered)
     #We need to make sure that there is no comma in any of the file names or this can wreck functions using csvs.
     #We will search for these and remove them. Ideally we could do this once for the entire dataset but this would require
     #checking all variables and then all the levels of all the factor variables. Since this is linear in the number of 
     #features this check shouldn't be computationally difficult so we will do the "lazy" way and check for commas here 
     #and remove them for every fold.
-    namesWithCommas = which(grepl(",",names(listOfNormalizedDataset$Training[[i]])))
-    if(length(namesWithCommas) > 0){
-      names(listOfNormalizedDataset$Training[[i]])[namesWithCommas] = gsub(",","COMMA",
-                                                                        names(listOfNormalizedDataset$Training[[i]])[namesWithCommas])
-      names(listOfNormalizedDataset$Testing[[i]])[namesWithCommas] = gsub(",","COMMA",
-                                                                        names(listOfNormalizedDataset$Testing[[i]])[namesWithCommas])
+    names(listOfNormalizedDatasets$Training[[i]]) = make.names(names(listOfNormalizedDatasets$Training[[i]]),unique=T)
+    names(listOfNormalizedDatasets$Testing[[i]]) = make.names(names(listOfNormalizedDatasets$Testing[[i]]),unique=T)
     }
-  return(listOfNormalizedDataset)
+
+  return(listOfNormalizedDatasets)
 }
 
 
