@@ -70,6 +70,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
         combinedTestResults$Cox = list()
         coxTimes = NULL
         CoxKP = F
+        evaluationResults = with(evaluationResults,evaluationResults[-which(Model == "CoxKP"),])
       }
       else{
         combinedTestResults$Cox[[i]] = coxMod
@@ -95,6 +96,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
           combinedTestResults$AFT = list()
           aftTimes = NULL
           AFTModel = F
+          evaluationResults = with(evaluationResults,evaluationResults[-which(Model == "AFT"),])
         }
       else{
           combinedTestResults$AFT[[i]] = aftMod
