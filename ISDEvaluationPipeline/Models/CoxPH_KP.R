@@ -19,15 +19,15 @@ library(survival)
 CoxPH_KP = function(training, testing){
   tryCatch({
     coxModel = coxph(Surv(time,delta)~., data = training,singular.ok = T)
+    survivalCurves = survfit(coxModel, testing, type = "kalbfleisch-prentice")
   },
   error = function(e) {
     message(e)
     warning("Cox-PH failed to converge (likely due to singularity). Future runs have been eliminated for Cox.")
   })
-  if(!exists("coxModel")){
+  if(!exists("coxModel") | !exists("survivalCurves")){
     return(NA)
   }
-  survivalCurves = survfit(coxModel, testing, type = "kalbfleisch-prentice")
   if(0 %in% survivalCurves$time){
     timePoints = survivalCurves$time
     probabilities = survivalCurves$surv

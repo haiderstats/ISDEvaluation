@@ -21,13 +21,14 @@ library(survival)
 
 AFT = function(training, testing, AFTDistribution){
   tryCatch({
-    aftMod = survreg(Surv(time,delta)~., data = training, dist = AFTDistribution)
+    AFTMod = survreg(Surv(time,delta)~., data = training, dist = AFTDistribution)
+    survivalCurves = survfunc(AFTMod, newdata = testing, t = timesToPredict)
   },
   error = function(e) {
     message(e)
     warning("AFT failed to converge (likely due to singularity). Future runs have been eliminated for AFT.")
   })
-  if(!exists("aftMod")){
+  if(!exists("AFTMod") | !exists("survivalCurves")){
     return(NA)
   }
   trainingTimes = sort(unique(training$time))
@@ -36,7 +37,6 @@ AFT = function(training, testing, AFTDistribution){
   } else {
     timesToPredict = c(0,trainingTimes)
   }
-  survivalCurves = survfunc(aftMod, newdata = testing, t = timesToPredict)
   probabilities = survivalCurves$sur
   #Since survfunc returns survival probabilities with the first time point for every individual (ordered by how the testing individuals)
   #were passed in, we can simply fill a matrix by row to have each individual curve be a column. This can be verified by checking
