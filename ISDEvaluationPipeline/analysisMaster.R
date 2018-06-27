@@ -42,7 +42,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
                           DCal = T, OneCal = T, Concor = T, L1Measure = T, Brier = T, #Evaluations
                           DCalBins = 10, OneCalTime = NULL,  concordanceTies = "Risk", #Evaluation args
                           BrierTime = NULL, numBrierPoints = 1000, Ltype = "Margin", Llog = F, #Evaluation args
-                          typeOneCal = "BucketKM", oneCalBuckets = 10, #Evaluation args
+                          typeOneCal = "BucketKM", oneCalBuckets = 10, survivalPredictionMethod = "Mean", #Evaluation args
                           AFTDistribution = "weibull", ntree = 1000, #Model args,
                           FeatureSelection = T # Misc args
                           ){
@@ -70,7 +70,8 @@ analysisMaster = function(survivalDataset, numberOfFolds,
         combinedTestResults$Cox = list()
         coxTimes = NULL
         CoxKP = F
-        evaluationResults = with(evaluationResults,evaluationResults[-which(Model == "CoxKP"),])
+        if(i > 1)
+          evaluationResults = with(evaluationResults,evaluationResults[-which(Model == "CoxKP"),])
       }
       else{
         combinedTestResults$Cox[[i]] = coxMod
@@ -96,7 +97,8 @@ analysisMaster = function(survivalDataset, numberOfFolds,
           combinedTestResults$AFT = list()
           aftTimes = NULL
           AFTModel = F
-          evaluationResults = with(evaluationResults,evaluationResults[-which(Model == "AFT"),])
+          if(i >1)
+            evaluationResults = with(evaluationResults,evaluationResults[-which(Model == "AFT"),])
         }
       else{
           combinedTestResults$AFT[[i]] = aftMod
@@ -119,7 +121,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       rsfDcal = DCalibration(rsfMod, DCalBins)
       aftDcal = DCalibration(aftMod, DCalBins)
       mtlrDcal = DCalibration(mtlrMod, DCalBins)
-      DCalResults = rbind(coxDcal, kmDcal, rsfDcal,aftDcal,mtlrDcal)
+      DCalResults = rbind(coxDcal, kmDcal, rsfDcal, aftDcal,mtlrDcal)
     }
     if(OneCal){
       print("Staring Evaluation: One-Calibration")
@@ -132,17 +134,17 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     }
     if(Concor){
       print("Staring Evaluation: Concordance")
-      coxConcCens = Concordance(coxMod, concordanceTies, T)
-      kmConcCens = Concordance(kmMod, concordanceTies, T)
-      rsfConcCens = Concordance(rsfMod, concordanceTies, T)
-      aftConcCens = Concordance(aftMod, concordanceTies, T)
-      mtlrConcCens = Concordance(mtlrMod, concordanceTies, T)
+      coxConcCens = Concordance(coxMod, concordanceTies, T,survivalPredictionMethod)
+      kmConcCens = Concordance(kmMod, concordanceTies, T,survivalPredictionMethod)
+      rsfConcCens = Concordance(rsfMod, concordanceTies, T,survivalPredictionMethod)
+      aftConcCens = Concordance(aftMod, concordanceTies, T,survivalPredictionMethod)
+      mtlrConcCens = Concordance(mtlrMod, concordanceTies, T,survivalPredictionMethod)
       
-      coxConcUncens = Concordance(coxMod, concordanceTies, F)
-      kmConcUncens = Concordance(kmMod, concordanceTies, F)
-      rsfConcUncens = Concordance(rsfMod, concordanceTies, F)
-      aftConcUncens = Concordance(aftMod, concordanceTies, F)
-      mtlrConcUncens = Concordance(mtlrMod, concordanceTies, F)
+      coxConcUncens = Concordance(coxMod, concordanceTies, F,survivalPredictionMethod)
+      kmConcUncens = Concordance(kmMod, concordanceTies, F,survivalPredictionMethod)
+      rsfConcUncens = Concordance(rsfMod, concordanceTies, F,survivalPredictionMethod)
+      aftConcUncens = Concordance(aftMod, concordanceTies, F,survivalPredictionMethod)
+      mtlrConcUncens = Concordance(mtlrMod, concordanceTies, F,survivalPredictionMethod)
       
       ConcCensResults = rbind(coxConcCens, kmConcCens, rsfConcCens, aftConcCens, mtlrConcCens)
       ConcUncensResults = rbind(coxConcUncens, kmConcUncens, rsfConcUncens, aftConcUncens, mtlrConcUncens)
@@ -166,11 +168,11 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     }
     if(L1Measure){
       print("Staring Evaluation: L1 Loss")
-      coxL1 = L1(coxMod, Ltype, Llog)
-      kmL1 = L1(kmMod, Ltype, Llog)
-      rsfL1 = L1(rsfMod, Ltype, Llog)
-      aftL1 = L1(aftMod, Ltype, Llog)
-      mtlrL1 = L1(mtlrMod, Ltype, Llog)
+      coxL1 = L1(coxMod, Ltype, Llog,survivalPredictionMethod)
+      kmL1 = L1(kmMod, Ltype, Llog,survivalPredictionMethod)
+      rsfL1 = L1(rsfMod, Ltype, Llog,survivalPredictionMethod)
+      aftL1 = L1(aftMod, Ltype, Llog,survivalPredictionMethod)
+      mtlrL1 = L1(mtlrMod, Ltype, Llog,survivalPredictionMethod)
       
       L1Results = rbind(coxL1,kmL1,rsfL1,aftL1,mtlrL1)
     }
@@ -204,7 +206,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     aftCum1cal = OneCalibrationCumulative(combinedTestResults$AFT, OneCalTime, typeOneCal, oneCalBuckets)
     mtlrCum1cal = OneCalibrationCumulative(combinedTestResults$MTLR, OneCalTime, typeOneCal, oneCalBuckets)
     
-    OneCalCumResults = c(coxCum1cal, kmCum1cal, rsfCum1cal, aftCum1cal, mtlrCum1cal)
+    OneCalCumResults = c(coxCum1cal, kmCum1cal, rsfCum1cal,aftCum1cal, mtlrCum1cal)
     evaluationResults$OneCalCumResults = rep(OneCalCumResults, numberOfFolds)
   }
   #We will add some basic information about the dataset.
@@ -255,8 +257,11 @@ getSurvivalCurves = function(coxTimes, kmTimes, aftTimes, rsfTimes, mtlrTimes,
                                                         curveSpline = splinefun(times,x,method='hyman')
                                                         maxSpline = curveSpline(maxTime)
                                                         curveSplineConstant = function(time){
-                                                          time = ifelse(time > maxTime, maxTime,time)
-                                                          return(curveSpline(time))
+                                                          timeToEval = ifelse(time > maxTime, maxTime,time)
+                                                          toReturn = rep(NA,length(time))
+                                                          toReturn[timeToEval== maxTime] = 0
+                                                          toReturn[timeToEval !=maxTime] = curveSpline(timeToEval[timeToEval!=maxTime])
+                                                          return(toReturn)
                                                         }
                                                         extraPoints =curveSplineConstant(timesToEvaluate)
                                                         toReturn = rep(NA, length(allTimes[[j]]))
