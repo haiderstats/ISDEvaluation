@@ -42,15 +42,14 @@ predictMeanSurvivalTimeSpline = function(survivalCurve, predictedTimes){
   spline = splinefun(predictedTimes, survivalCurve, method = "hyman")
   maxTime = max(predictedTimes)
   slope = (1-spline(maxTime))/(0 - max(predictedTimes))
-  zeroProbabilitiyTime = maxTime + (0-spline(maxTime))/slope
+  zeroProbabilitiyTime = min( predictedTimes[which(survivalCurve ==0)], maxTime + (0-spline(maxTime))/slope)
   splineWithLinear = function(time) ifelse(time < maxTime, spline(time),1 + time*slope)
   area = integrate(splineWithLinear,0, zeroProbabilitiyTime,subdivisions = 1000,rel.tol = .001)[[1]]
   return(area)
 }
 
 predictMedianSurvivalTimeSpline = function(survivalCurve, predictedTimes){
-  #If all the predicted probabilities are 1 the integral will be infinite. For this reason we slightly decrease the 
-  #last value.
+  #If all the predicted probabilities are 1 the integral will be infinite.
   if(all(survivalCurve==1)){
     return(Inf)
   }
@@ -64,6 +63,7 @@ predictMedianSurvivalTimeSpline = function(survivalCurve, predictedTimes){
     medianProbabilityTime = splineInv(0.5)
   }
   else{
+    maxTime = max(predictedTimes)
     slope = (1-spline(maxTime))/(0 - max(predictedTimes))
     medianProbabilityTime = maxTime + (0.5-spline(maxTime))/slope
   }

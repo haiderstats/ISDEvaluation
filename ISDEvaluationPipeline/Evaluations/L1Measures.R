@@ -20,7 +20,7 @@ library(plyr)
 #Helper Functions: predictMeanSurvivalTimeSpline(survivalCurve,predictedTimes)
 source("Evaluations/EvaluationHelperFunctions.R")
 
-L1 = function(survMod, type = "Uncensored", logScale = F){
+L1 = function(survMod, type = "Uncensored", logScale = F, method = "Mean"){
   #Being passed an empty model.
   if(is.null(survMod)) return(NULL)
   #Being passed a model that failed.
@@ -33,11 +33,14 @@ L1 = function(survMod, type = "Uncensored", logScale = F){
   trainingDeathTimes = survMod[[3]]$time
   trainingCensorStatus = survMod[[3]]$delta
   
+  predictMethod = switch(method,
+                         Mean = predictMeanSurvivalTimeSpline,
+                         Median = predictMedianSurvivalTimeSpline)
   averageUncensored = unlist(lapply(which(as.logical(censorStatus)),
-                                    function(index) predictMeanSurvivalTimeSpline(survivalCurves[,index],
+                                    function(index) predictMethod(survivalCurves[,index],
                                                                                   predictedTimes)))
   averageCensored = unlist(lapply(which(as.logical(1-censorStatus)),
-                                  function(index) predictMeanSurvivalTimeSpline(survivalCurves[,index],
+                                  function(index) predictMethod(survivalCurves[,index],
                                                                                 predictedTimes)))
   
   uncensoredPiece = ifelse(!logScale,

@@ -31,7 +31,7 @@ source("Evaluations/EvaluationHelperFunctions.R")
 #curves and the true death times of test subjects. Part 2 is only used if we are to include concordance calculations for two censored patients,
 #see the paper for the details on this calculation. Part 3 uses survConcordance to calculate classical concordance measures. We then 
 #add in the censored piece from part 2 if includeCensored == True. Additionally, this is were tied data is handled.
-Concordance = function(survMod, ties = "None",includeCensored =F){
+Concordance = function(survMod, ties = "None",includeCensored =F, method = "Mean"){
   #Part 1:
   #Being passed an empty model.
   if(is.null(survMod)) return(NULL)
@@ -46,9 +46,12 @@ Concordance = function(survMod, ties = "None",includeCensored =F){
   trainingDeathTimes = survMod[[3]]$time
   trainingCensorStatus = survMod[[3]]$delta
   
+  predictMethod = switch(method,
+                         Mean = predictMeanSurvivalTimeSpline,
+                         Median = predictMedianSurvivalTimeSpline)
   #This retrieves the mean death probability of the survival curve.
   averageSurvivalTimes = unlist(lapply(seq_along(trueDeathTimes),
-                                       function(index) predictMeanSurvivalTimeSpline(survivalCurves[,index],
+                                       function(index) predictMethod(survivalCurves[,index],
                                                                                      predictedTimes)))
   #Part 2:
   if(includeCensored){
