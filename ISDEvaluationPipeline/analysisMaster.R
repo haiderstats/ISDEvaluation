@@ -44,10 +44,10 @@ analysisMaster = function(survivalDataset, numberOfFolds,
                           BrierTime = NULL, numBrierPoints = 1000, Ltype = "Margin", Llog = F, #Evaluation args
                           typeOneCal = "BucketKM", oneCalBuckets = 10, survivalPredictionMethod = "Mean", #Evaluation args
                           AFTDistribution = "weibull", ntree = 1000, #Model args,
-                          FeatureSelection = T, imputeZero=T # Misc args
+                          FS = T, imputeZero=T # Misc args
                           ){
   validatedData = validateAndClean(survivalDataset, imputeZero)
-  if(FeatureSelection)
+  if(FS)
     validatedData = FeatureSelection(validatedData, type = "UniCox")
   foldsAndNormalizedData = createFoldsAndNormalize(validatedData, numberOfFolds)
   originalIndexing = foldsAndNormalizedData[[1]]
@@ -82,7 +82,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       print("Starting Cox Proportional Hazards - Elastic Net.")
       coxENMod = CoxPH_KP(training, testing,ElasticNet = T)
       combinedTestResults$CoxEN[[i]] = coxENMod
-      coxENTimes = c(coxTimes,coxENMod[[1]]$time)
+      coxENTimes = c(coxENTimes,coxENMod[[1]]$time)
     }
     if(KaplanMeier){
       print("Starting Kaplan Meier.")
@@ -291,7 +291,7 @@ getSurvivalCurves = function(coxTimes,coxENTimes, kmTimes, aftTimes, rsfTimes, m
       ))
     }
     fullCurves = cbind.data.frame(allTimes[j], fullCurves)
-    fullCurves[originalIndexOrder]
+    fullCurves =  fullCurves[originalIndexOrder]
     colnames(fullCurves) = c("time",1:(ncol(fullCurves)-1))
     survivalCurves[[count]] = fullCurves
   }
