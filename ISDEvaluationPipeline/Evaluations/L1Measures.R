@@ -39,13 +39,25 @@ L1 = function(survMod, type = "Uncensored", logScale = F, method = "Mean"){
   averageUncensored = unlist(lapply(which(as.logical(censorStatus)),
                                     function(index) predictMethod(survivalCurves[,index],
                                                                                   predictedTimes)))
+  
   averageCensored = unlist(lapply(which(as.logical(1-censorStatus)),
                                   function(index) predictMethod(survivalCurves[,index],
                                                                                 predictedTimes)))
+  #Sometimes the mean is infinite or extrememly, unreasonable large. Since this  will largely sway the L1 measure, we enforce that 
+  #a model cannot predict a value higher than the end of the KM curve with the linear extension since this is what we believe to be 
+  #the "true" survival curve of the population. 
+  KMCurve = prodlim(Surv(trainingDeathTimes, trainingCensorStatus)~1)
+  KMLinearZero = -1/((1-min(KMCurve$surv))/(0 - max(KMCurve$time)))
+  #If every patient is censored we choose the last time point to be the maximum time.
+  if(is.infinite(KMLinearZero))
+    KMLinearZero = max(KMCurve$time)
+  averageUncensored = pmin(averageUncensored, KMLinearZero)
+  averageCensored = pmin(averageCensored, KMLinearZero)
+  
   
   uncensoredPiece = ifelse(!logScale,
-                           sum(abs(trueDeathTimes[as.logical(censorStatus)][averageUncensored!=Inf] - averageUncensored[averageUncensored !=Inf])),
-                           sum(abs(log(trueDeathTimes[as.logical(censorStatus)][averageUncensored!=Inf]) - log(averageUncensored[averageUncensored!=Inf]))))
+                           sum(abs(trueDeathTimes[as.logical(censorStatus)] - averageUncensored)),
+                           sum(abs(log(trueDeathTimes[as.logical(censorStatus)]) - log(averageUncensored))))
   L1Measure = switch(type,
                      Uncensored = {
                        L1Measure = (1/sum(censorStatus))*uncensoredPiece
@@ -59,26 +71,25 @@ L1 = function(survMod, type = "Uncensored", logScale = F, method = "Mean"){
                        L1Measure = (1/(length(censorStatus)))*(uncensoredPiece + hingePieceCorrected)                     
                     },
                      Margin = {
-                       KMCurve = prodlim(Surv(trainingDeathTimes, trainingCensorStatus)~1)
                        KMLinearPredict = function(time){
                          prediction = predict(KMCurve,time)
                          slope = (1-min(KMCurve$surv))/(0 - max(KMCurve$time))
                          predictedProbabiliteis = ifelse(is.na(prediction), pmax(1+time*slope,0), prediction)
                          return(predictedProbabiliteis)
                        }
-                       KMLinearZero = -1/((1-min(KMCurve$surv))/(0 - max(KMCurve$time)))
                        bestGuess = unlist(lapply(censorTimes,
                               function(time) time + integrate(KMLinearPredict,
                                                               lower = time, 
-                                                              upper = KMLinearZero,subdivisions = 2000,rel.tol = .01)[[1]]/KMLinearPredict(time)))
+                                                              upper = KMLinearZero,subdivisions = 2000,
+                                                              rel.tol = .01)[[1]]/KMLinearPredict(time)))
                        bestGuess = ifelse(is.nan(bestGuess),0,bestGuess)
                        weights = 1- KMLinearPredict(censorTimes)
                        marginPiece = ifelse(!logScale,
                                             #Use weights!=0 incase there is an infinitiy, we don't get NaN.
-                                            sum(weights[weights!=0 & averageCensored!= Inf]*(abs(bestGuess[weights!=0 & averageCensored!=Inf] - averageCensored[weights!=0 & averageCensored!=Inf]))),
-                                            sum(weights[weights!=0 & averageCensored!= Inf]*(abs(log(bestGuess[weights!=0 & averageCensored!=Inf]) - log(averageCensored[weights!=0 & averageCensored!=Inf]))))
+                                            sum(weights*(abs(bestGuess - averageCensored))),
+                                            sum(weights*(abs(log(bestGuess) - log(averageCensored))))
                        )
-                       L1Measure = (1/length(censorStatus))*(uncensoredPiece + marginPiece)
+                       L1Measure = (1/sum(censorStatus))*(uncensoredPiece) + (1/sum(weights))*marginPiece
                      }
   )
   return(L1Measure)
