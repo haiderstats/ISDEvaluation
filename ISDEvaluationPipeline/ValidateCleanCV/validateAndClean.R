@@ -17,13 +17,13 @@
 library(caret)
 #Functions:
 
-validateAndClean = function(survivalDataset){
-  validatedData = validate(survivalDataset)
+validateAndClean = function(survivalDataset, imputeZero=T){
+  validatedData = validate(survivalDataset, imputeZero=T)
   cleanData = clean(validatedData)
   return(cleanData)
 }
 
-validate = function(survivalDataset){
+validate = function(survivalDataset,imputeZero){
   if(is.null(survivalDataset) || nrow(survivalDataset) == 0)
     stop("You must enter a nonempty survival dataset.")
   if(!"time" %in% names(survivalDataset))
@@ -46,10 +46,17 @@ validate = function(survivalDataset){
     InftimeIndex = which(is.infinite(survivalDataset$time))
     survivalDataset = survivalDataset[-InftimeIndex,]
   }
-  if(any(survivalDataset$time <=0)){
-    warning("'time' includes non-positive values. These rows have been removed.")
-    nonPosTimeIndex = which(survivalDataset$time <=0)
+  if(any(survivalDataset$time <0)){
+    warning("'time' includes negative values. These rows have been removed.")
+    nonPosTimeIndex = which(survivalDataset$time <0)
     survivalDataset = survivalDataset[-nonPosTimeIndex,]
+  }
+  if(any(survivalDataset$time ==0) & imputeZero){
+    imputeVal  =min(survivalDataset$time[survivalDataset$time > 0])/2
+    warning(paste("'time' includes 0 valued times. These have been imputed to half the minimum positive time point:",
+                  imputeVal))
+    zeroTimeIndex = which(survivalDataset$time ==0)
+    survivalDataset[zeroTimeIndex,]$time = imputeVal
   }
   if(any(is.na(survivalDataset$delta))){
     warning("'delta' includes NA values. These rows have been removed.")
