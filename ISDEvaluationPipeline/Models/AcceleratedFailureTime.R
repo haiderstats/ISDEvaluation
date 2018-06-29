@@ -65,7 +65,8 @@ survfunc = function (object, t, newdata, name = "t") {
   lp <- predict(object, newdata = newdata, type = "lp")
   if (object$dist %in% c("weibull", "exponential")) {
     newdata$pdf <- dweibull(t, 1/object$scale, exp(lp))
-    newdata$cdf <- ifelse(is.nan(pweibull(t, 1/object$scale, exp(lp))),1,pweibull(t, 1/object$scale, exp(lp)))
+    newdata$cdf <- ifelse(t == 0,0,
+                          ifelse(is.nan(pweibull(t, 1/object$scale, exp(lp))),1,pweibull(t, 1/object$scale, exp(lp))))
     newdata$haz <- exp(dweibull(t, 1/object$scale, exp(lp), 
                                 log = TRUE) - pweibull(t, 1/object$scale, exp(lp), 
                                                        lower.tail = FALSE, log.p = TRUE))
