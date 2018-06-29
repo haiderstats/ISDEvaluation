@@ -15,7 +15,7 @@
 #times and censor status of the TRAINING set.
 ############################################################################################################################################
 
-MTLR = function(training, testing){
+MTLR = function(training, testing,linearTail=T){
   #The idea here is to have the working directory sitting in ISDEvaluationPipeline. We move the working directory into the folder
   #with executables for ease of execution and move back to the original working directory before exiting the function.
   executablesPath = "Models/AdditionalMTLRFiles/"
@@ -29,16 +29,27 @@ MTLR = function(training, testing){
   system("./mtlr_opt -i training.mtlr",ignore.stdout = T)
   system("./mtlr_test -i testing.mtlr -s training.mtlr -o ./fold1_modelfile > MTLR_output.txt")
   times = unlist((unname(read.table("fold1_modelfile",skip = 1,sep = ",",nrows = 1))))
-  #There are more survival probabilities than survival time points. Further, the previous writer of code (Fatima) used the last time point
-  #squared divided by the second to last time point. I'm guessing that that this was done using some information not known to me at 
-  #this time so until further notice we will do the same.
-  lastTimePoint = round(times[length(times)]^2/times[length(times) -1])
-  #Add the last time point and a 0 time point if needed.
-  if(0 %in% times){
-    timePoints = c(times,lastTimePoint)
-  } else{
-    timePoints = c(0,times, lastTimePoint)
-  } 
+  if(!linearTail){
+    #It appears the last survival probability is always appearing to be zero... which is odd.
+    #There are more survival probabilities than survival time points. Further, the previous writer of code (Fatima) used the last time point
+    #squared divided by the second to last time point. I'm guessing that that this was done using some information not known to me at 
+    #this time so until further notice we will do the same. 
+    lastTimePoint = round(times[length(times)]^2/times[length(times) -1])
+    #Add the last time point and a 0 time point if needed.
+    if(0 %in% times){
+      timePoints = c(times,lastTimePoint)
+    } else{
+      timePoints = c(0,times, lastTimePoint)
+    } 
+  }
+  else{
+    if(0 %in% times){
+      timePoints = times
+    } else{
+      timePoints = c(0,times)
+    } 
+  }
+
   testingPoints = read.table("MTLR_output.txt")
   #Clean up directory:
   system("rm fold1_modelfile CI_log Ptrain1 Pmodel1 *.csv *.mtlr *.txt")
@@ -49,8 +60,13 @@ MTLR = function(training, testing){
   censorStatus = 1 -testingPoints[,2]
   #We don't want the averages (first 3 columns) and the last column is some evaluation of survival probability at the true time of death.
   #We will discard this since later on we have a method used for every survival curve. Further we minus 1 because we dont want to include the 
-  #0th time point. So we have ignore first 4 columns through the number of time points, subtracting 1 for the 0th time point.
-  survivalProbabilities = testingPoints[5:(4+length(timePoints)-1)]
+  #0th time point, i.e. since we use length(timePoints) we need to subtract an extra value it since we included a 0.
+  #So we have ignore first 4 columns through the number of time points, subtracting 1 for the 0th time point (if we included a zero).
+  if(0 %in% times){
+      survivalProbabilities = testingPoints[5:(4+length(timePoints))]
+  } else{
+      survivalProbabilities = testingPoints[5:(4+length(timePoints)-1)]
+    }
   #Survival probabilities were read in a factors and contain commas. We will clean this out by turning them into character vectors and 
   #trimming commas.
   survivalProbabilities = apply(survivalProbabilities,c(1,2),as.character)
@@ -68,8 +84,6 @@ MTLR = function(training, testing){
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
   return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))  
 }
-  
-  
   
   
   
