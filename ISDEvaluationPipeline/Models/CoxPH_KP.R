@@ -15,18 +15,47 @@
 #Library Dependencies
 #survival is needed to get survfit and the implimentation of the KP estimator.
 library(survival)
+#For EN-Cox
+library(fastcox)
+#For sindex
+library(prodlim)
 
-CoxPH_KP = function(training, testing){
-  tryCatch({
-    coxModel = coxph(Surv(time,delta)~., data = training,singular.ok = T)
-    survivalCurves = survfit(coxModel, testing, type = "kalbfleisch-prentice")
-  },
-  error = function(e) {
-    message(e)
-    warning("Cox-PH failed to converge (likely due to singularity). Future runs have been eliminated for Cox.")
-  })
-  if(!exists("coxModel") | !exists("survivalCurves")){
-    return(NA)
+CoxPH_KP = function(training, testing,ElasticNet=F){
+  if(ElasticNet){
+    timeInd = which(names(training) == "time")
+    deltaInd = which(names(training) == "delta")
+    alpha = NULL
+    lambda = NULL
+    bestError = Inf
+    for(i in c(0.01,.2,.4,.6,.8,1)){
+      model =  cv.cocktail(as.matrix(training[,-c(timeInd, deltaInd)]),training[,timeInd], training[,deltaInd],alpha = i)
+      modelBestLambdaIndex = which(model$lambda == model$lambda.min)
+      modelError = model$cvm[modelBestLambdaIndex]
+      if(modelError < bestError){
+        alpha = i
+        lambda = model$lambda.min
+        bestError = modelError
+      }
+    }
+    coxModel = cocktail(as.matrix(training[,-c(timeInd, deltaInd)]),training[,timeInd], training[,deltaInd],alpha = alpha,lambda = lambda)
+    linearPredictionsTraining = predict(coxModel,as.matrix(training[,-c(timeInd, deltaInd)]),type = "link")
+    linearPredictionsTesting = predict(coxModel,as.matrix(testing[,-c(timeInd, deltaInd)]),type = "link")
+    survivalEstimate = KPEstimator(linearPredictionsTraining, training$time,training$delta)
+    survCurvs = t(sapply(survivalEstimate[[2]], function(x) x^exp(linearPredictionsTesting)))
+    survivalCurves = list(time = survivalEstimate[[1]], surv = survCurvs)
+  }
+  else{
+    tryCatch({
+      coxModel = coxph(Surv(time,delta)~., data = training,singular.ok = T)
+      survivalCurves = survfit(coxModel, testing, type = "kalbfleisch-prentice")
+    },
+    error = function(e) {
+      message(e)
+      warning("Cox-PH failed to converge (likely due to singularity). Future runs have been eliminated for Cox.")
+    })
+    if(!exists("coxModel") | !exists("survivalCurves")){
+      return(NA)
+    }
   }
   if(0 %in% survivalCurves$time){
     timePoints = survivalCurves$time
@@ -41,6 +70,14 @@ CoxPH_KP = function(training, testing){
   return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))  
 }
 
-
+#not considering ties.
+KPEstimator = function(lp,lpTime,censorStatus){
+  indexToKeep = sindex(sort(lpTime), unique(sort(lpTime)))
+  orderLPTime = order(lpTime)
+  cumHaz = rev(cumsum(rev(exp(lp[orderLPTime]))))
+  alpha = ((1-(exp(lp[orderLPTime])/cumHaz)))^exp(-lp[orderLPTime])
+  survivalFunc = cumprod(alpha^censorStatus[orderLPTime])
+  return(list(time = lpTime[orderLPTime][indexToKeep],surv = survivalFunc[indexToKeep]))
+}
 
 
