@@ -66,7 +66,7 @@ OneCalibration = function(survMod, timeOfInterest = NULL, type = "BucketKM", num
   return(pval)
 }
 
-OneCalibrationCumulative = function(listOfSurvivalModels, timeOfInterest = NULL, type = "BucketKM", numBuckets = 10){
+OneCalibrationCumulative = function(listOfSurvivalModels, timeOfInterest = c(), type = "BucketKM", numBuckets = 10){
   if(length(listOfSurvivalModels) ==0) return(NULL)
   suppressWarnings(if(any(unlist(lapply(listOfSurvivalModels, is.na)))) return(NA))
   if(!type %in% c("Uncensored","Fractional","BucketKM"))
@@ -79,29 +79,16 @@ OneCalibrationCumulative = function(listOfSurvivalModels, timeOfInterest = NULL,
   #If time is null, we will select the median from the training instances (of those who were uncensored.)
   if(is.null(timeOfInterest)){
     allTimes = unlist(trueDeathTimes)
-    allCensorStatus = unlist(censorStatus)
-    KMCurve = prodlim(Surv(allTimes, allCensorStatus)~1)
-    timeOfInterest = tryCatch({
-      quantile(KMCurve,.5)$quantiles.survival$quantile
-    },
-    #Catch the case where there is too many censored patients to generate a KM Curve. In this case we use our linear extension to find the 
-    #Median.
-    error = function(e){
-      slope = (1-min(KMCurve$surv))/(0 - max(KMCurve$time))
-      timeOfInterest = (-0.5)/slope
-    })
+    timeOfInterest = unname(quantile(allTimes,c(.1,.25,.5,.75,.9)))
   }
-  #Additionally sometimes the quantile function will return NA instead of an error if it still able to produce a lower bound. Here we 
-  #do the same thing as above when we catch the error.
-  if(is.na(timeOfInterest)){
-    slope = (1-min(KMCurve$surv))/(0 - max(KMCurve$time))
-    timeOfInterest = (-0.5)/slope
+  pval = c()
+  for(times in 1:length(timeOfInterest)){
+    predictions = unlist(lapply(seq_along(listOfSurvivalModels), function(model) lapply(seq_along(trueDeathTimes[[model]]),
+                                                                                        function(index) predictProbabilityFromCurve(survivalCurves[[model]][,index],
+                                                                                                                                    predictedTimes[[model]],
+                                                                                                                                    timeOfInterest[times]))))
+    pval = c(pval,binItUp(unlist(trueDeathTimes),unlist(censorStatus), predictions, type, numBuckets,timeOfInterest[times]))
   }
-  predictions = unlist(lapply(seq_along(listOfSurvivalModels), function(model) lapply(seq_along(trueDeathTimes[[model]]),
-                              function(index) predictProbabilityFromCurve(survivalCurves[[model]][,index],
-                                                                          predictedTimes[[model]],
-                                                                          timeOfInterest))))
-  pval = binItUp(unlist(trueDeathTimes),unlist(censorStatus), predictions, type, numBuckets,timeOfInterest)
   return(pval)
 }
 

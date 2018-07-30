@@ -221,8 +221,14 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     aftCum1cal = OneCalibrationCumulative(combinedTestResults$AFT, OneCalTime, typeOneCal, oneCalBuckets)
     mtlrCum1cal = OneCalibrationCumulative(combinedTestResults$MTLR, OneCalTime, typeOneCal, oneCalBuckets)
     
-    OneCalCumResults = c(coxCum1cal,coxENCum1cal, kmCum1cal, rsfCum1cal,aftCum1cal, mtlrCum1cal)
-    evaluationResults$OneCalCumResults = rep(OneCalCumResults, numberOfFolds)
+    numTimes = max(sapply(list(coxCum1cal,coxENCum1cal, kmCum1cal, rsfCum1cal,aftCum1cal, mtlrCum1cal),length))
+    
+    for(times in 1:numTimes){
+      varName = paste("OneCalCumResults",times, sep="")
+      assign(varName,c(coxCum1cal[times],coxENCum1cal[times], kmCum1cal[times], rsfCum1cal[times],aftCum1cal[times], mtlrCum1cal[times]))
+      evaluationResults[varName] = rep(eval(parse(text=varName)), numberOfFolds)
+    }
+    print(evaluationResults)
   }
   #We will add some basic information about the dataset.
   evaluationResults$N = nrow(validatedData)
@@ -233,7 +239,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
   survivalCurves = getSurvivalCurves(coxTimes,coxENTimes, kmTimes, aftTimes, rsfTimes, mtlrTimes,
                                      CoxKP,CoxKPEN, KaplanMeier, RSFModel, AFTModel, MTLRModel,
                                      combinedTestResults, numberOfFolds,originalIndexing)
-  names(survivalCurves) = models
+  names(survivalCurves) = c("Cox","CoxEN","KM","AFT","RSF","MTLR")[c(CoxKP,CoxKPEN, KaplanMeier, AFTModel,RSFModel, MTLRModel)]
   return(list(datasetUsed = validatedData, survivalCurves = survivalCurves, results = evaluationResults))
 }
 
@@ -276,7 +282,7 @@ getSurvivalCurves = function(coxTimes,coxENTimes, kmTimes, aftTimes, rsfTimes, m
                                                         curveSplineConstant = function(time){
                                                           timeToEval = ifelse(time > maxTime, maxTime,time)
                                                           toReturn = rep(NA,length(time))
-                                                          toReturn[timeToEval== maxTime] = 0
+                                                          toReturn[timeToEval== maxTime] = max(maxSpline,0)
                                                           toReturn[timeToEval !=maxTime] = curveSpline(timeToEval[timeToEval!=maxTime])
                                                           return(toReturn)
                                                         }
@@ -290,8 +296,8 @@ getSurvivalCurves = function(coxTimes,coxENTimes, kmTimes, aftTimes, rsfTimes, m
                                                       }
       ))
     }
-    fullCurves = cbind.data.frame(allTimes[j], fullCurves)
     fullCurves =  fullCurves[originalIndexOrder]
+    fullCurves = cbind.data.frame(allTimes[j], fullCurves)
     colnames(fullCurves) = c("time",1:(ncol(fullCurves)-1))
     survivalCurves[[count]] = fullCurves
   }
