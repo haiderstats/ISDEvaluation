@@ -18,7 +18,7 @@ library(caret)
 #Functions:
 
 validateAndClean = function(survivalDataset, imputeZero=T){
-  validatedData = validate(survivalDataset, imputeZero=T)
+  validatedData = validate(survivalDataset, imputeZero)
   cleanData = clean(validatedData)
   return(cleanData)
 }
