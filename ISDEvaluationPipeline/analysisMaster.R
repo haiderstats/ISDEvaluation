@@ -168,15 +168,24 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       aftBrierInt = BrierScore(aftMod, type = "Integrated", numPoints = numBrierPoints)
       mtlrBrierInt = BrierScore(mtlrMod, type = "Integrated", numPoints =  numBrierPoints)
       
-      coxBrierS = BrierScore(coxMod, type = "Single",singleTime = BrierTime)
-      coxENBrierS = BrierScore(coxENMod, type = "Single",singleTime = BrierTime)
-      kmBrierS = BrierScore(kmMod, type = "Single",singleTime = BrierTime)
-      rsfBrierS = BrierScore(rsfMod, type = "Single",singleTime = BrierTime)
-      aftBrierS = BrierScore(aftMod, type = "Single",singleTime = BrierTime)
-      mtlrBrierS = BrierScore(mtlrMod, type = "Single",singleTime = BrierTime)
-      
       BrierResultsInt = rbind(coxBrierInt,coxENBrierInt, kmBrierInt, rsfBrierInt, aftBrierInt, mtlrBrierInt)
-      BrierResultsSingle = rbind(coxBrierS,coxENBrierS, kmBrierS, rsfBrierS, aftBrierS, mtlrBrierS)
+      
+      BrierTimes = quantile(validatedData$time, c(.1,.25,.5,.75,.9))
+      coxBrierS = sapply(BrierTimes, function(x) BrierScore(coxMod, type = "Single",singleTime = x))
+      coxENBrierS = sapply(BrierTimes, function(x) BrierScore(coxENMod, type = "Single",singleTime = x))
+      kmBrierS = sapply(BrierTimes, function(x) BrierScore(kmMod, type = "Single",singleTime = x))
+      rsfBrierS = sapply(BrierTimes, function(x) BrierScore(rsfMod, type = "Single",singleTime = x))
+      aftBrierS = sapply(BrierTimes, function(x) BrierScore(aftMod, type = "Single",singleTime = x))
+      mtlrBrierS =sapply(BrierTimes, function(x) BrierScore(mtlrMod, type = "Single",singleTime = x))
+
+      numBrierTimes = max(sapply(list(coxBrierS,coxENBrierS, kmBrierS, rsfBrierS,aftBrierS, mtlrBrierS),length))
+      BrierResultsSingle = data.frame(row.names = 1:sum(c(CoxKP,CoxKPEN, KaplanMeier, RSFModel, AFTModel, MTLRModel)))
+      for(times in 1:numBrierTimes){
+        varName = paste("BrierResultsSingle",times, sep="")
+        currentNames = names(BrierResultsSingle)
+        BrierResultsSingle = cbind.data.frame(BrierResultsSingle, rbind.data.frame(coxBrierS[times],coxENBrierS[times], kmBrierS[times], rsfBrierS[times],aftBrierS[times], mtlrBrierS[times]))
+        names(BrierResultsSingle) = c(currentNames, varName)
+      }
     }
     if(L1Measure){
       print("Staring Evaluation: L1 Loss")
@@ -191,9 +200,9 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     }
     toAdd = as.data.frame(cbind(DCalResults, OneCalResults, ConcCensResults,ConcUncensResults,
                                 BrierResultsInt,BrierResultsSingle, L1Results))
-    metricsRan = c(DCal, OneCal, Concor,Concor,Brier,Brier, L1Measure)
+    metricsRan = c(DCal, OneCal, Concor,Concor,Brier,rep(Brier,numBrierTimes), L1Measure)
     names(toAdd) = c("DCalibration","OneCalibration","ConcordanceCensored","ConcordanceUncensensored",
-                     "BrierResultsInt","BrierResultsSingle", "L1Results")[metricsRan]
+                     "BrierResultsInt",names(BrierResultsSingle), "L1Results")[metricsRan]
     modelsRan = c(CoxKP,CoxKPEN, KaplanMeier, RSFModel, AFTModel, MTLRModel)
     models = c("CoxKP","CoxKPEN","Kaplan-Meier","RSF","AFT", "MTLR")[modelsRan]
     toAdd = cbind.data.frame(Model = models,FoldNumer = i, toAdd)
