@@ -24,10 +24,10 @@ MTLR = function(training, testing,linearTail=T){
   #Write csv files to be called by CovertDataFiles to make the correct format of input for MTLR.
   write.csv(training, paste("training.csv",sep=""), row.names = F)
   write.csv(testing, paste("testing.csv",sep=""), row.names = F)
-  system("java -cp ./ ConvertDataFiles convert2MTLR training.csv training.mtlr FlipCensoredBit")
-  system("java -cp ./ ConvertDataFiles convert2MTLR testing.csv testing.mtlr FlipCensoredBit")
-  system("./mtlr_opt -i training.mtlr",ignore.stdout = T)
-  system("./mtlr_test -i testing.mtlr -s training.mtlr -o ./fold1_modelfile > MTLR_output.txt")
+  system2("java -cp ./ ConvertDataFiles convert2MTLR training.csv training.mtlr FlipCensoredBit")
+  system2("java -cp ./ ConvertDataFiles convert2MTLR testing.csv testing.mtlr FlipCensoredBit")
+  system2("./mtlr_opt -i training.mtlr",stdout = FALSE)
+  system2("./mtlr_test -i testing.mtlr -s training.mtlr -o ./fold1_modelfile > MTLR_output.txt")
   times = unlist((unname(read.table("fold1_modelfile",skip = 1,sep = ",",nrows = 1))))
   if(!linearTail){
     #It appears the last survival probability is always appearing to be zero... which is odd.
