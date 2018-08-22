@@ -15,7 +15,7 @@
 #times and censor status of the TRAINING set.
 ############################################################################################################################################
 
-MTLR = function(training, testing,linearTail=T){
+MTLR = function(training, testing,addLastTimePoint=F){
   #The idea here is to have the working directory sitting in ISDEvaluationPipeline. We move the working directory into the folder
   #with executables for ease of execution and move back to the original working directory before exiting the function.
   executablesPath = "Models/AdditionalMTLRFiles/"
@@ -24,16 +24,14 @@ MTLR = function(training, testing,linearTail=T){
   #Write csv files to be called by CovertDataFiles to make the correct format of input for MTLR.
   write.csv(training, paste("training.csv",sep=""), row.names = F)
   write.csv(testing, paste("testing.csv",sep=""), row.names = F)
-  system2("java -cp ./ ConvertDataFiles convert2MTLR training.csv training.mtlr FlipCensoredBit")
-  system2("java -cp ./ ConvertDataFiles convert2MTLR testing.csv testing.mtlr FlipCensoredBit")
-  system2("./mtlr_opt -i training.mtlr",stdout = FALSE)
-  system2("./mtlr_test -i testing.mtlr -s training.mtlr -o ./fold1_modelfile > MTLR_output.txt")
+  system2("java", args=c('-cp ./',"ConvertDataFiles", "convert2MTLR", "training.csv", "training.mtlr", "FlipCensoredBit"))
+  system2("java", args=c('-cp ./',"ConvertDataFiles", "convert2MTLR", "testing.csv", "testing.mtlr", "FlipCensoredBit"))
+  system2("./mtlr_opt",args=c("-i", "training.mtlr"),stdout = FALSE)
+  system2("./mtlr_test", args=c("-i", "testing.mtlr", "-s","training.mtlr", "-o", "./fold1_modelfile > MTLR_output.txt"))
   times = unlist((unname(read.table("fold1_modelfile",skip = 1,sep = ",",nrows = 1))))
-  if(!linearTail){
-    #It appears the last survival probability is always appearing to be zero... which is odd.
-    #There are more survival probabilities than survival time points. Further, the previous writer of code (Fatima) used the last time point
-    #squared divided by the second to last time point. I'm guessing that that this was done using some information not known to me at 
-    #this time so until further notice we will do the same. 
+  if(!addLastTimePoint){
+    #It appears the last survival probability is always appearing to be zero. We need to add some additional time point to the end to account
+    #for this so we choose the value of the last time point  squared divided by the second to last time point. 
     lastTimePoint = round(times[length(times)]^2/times[length(times) -1])
     #Add the last time point and a 0 time point if needed.
     if(0 %in% times){
@@ -52,7 +50,7 @@ MTLR = function(training, testing,linearTail=T){
 
   testingPoints = read.table("MTLR_output.txt")
   #Clean up directory:
-  system("rm fold1_modelfile CI_log Ptrain1 Pmodel1 *.csv *.mtlr *.txt")
+  system2("rm",args=c("fold1_modelfile","CI_log","Ptrain1", "Pmodel1", "*.csv","*.mtlr","*.txt"))
   #Replace original working directory.
   setwd(originalWd)
   #the first 4 columns are the true time of death, 1- censoring status, and 2 different averaged survival times.
