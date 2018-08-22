@@ -33,7 +33,7 @@ AFT = function(training, testing, AFTDistribution){
   },
   error = function(e) {
     message(e)
-    warning("AFT failed to converge (likely due to singularity). Future runs have been eliminated for AFT.")
+    warning("AFT failed to converge.")
   })
   if(!exists("AFTMod") | !exists("survivalCurves")){
     return(NA)

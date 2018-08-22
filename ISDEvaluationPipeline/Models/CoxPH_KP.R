@@ -51,7 +51,7 @@ CoxPH_KP = function(training, testing,ElasticNet=F){
     },
     error = function(e) {
       message(e)
-      warning("Cox-PH failed to converge (likely due to singularity). Future runs have been eliminated for Cox.")
+      warning("Cox-PH failed to converge.")
     })
     if(!exists("coxModel") | !exists("survivalCurves")){
       return(NA)
