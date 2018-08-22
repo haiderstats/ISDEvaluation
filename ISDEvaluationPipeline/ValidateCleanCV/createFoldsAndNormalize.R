@@ -29,18 +29,18 @@
 #                                  |.--> Testing Dataset #K
 ############################################################################################################################################
 #Library dependencies:
-#caret is a common R machine learning package. Specifically, I call it here to avoid implementing my own cross validation function. 
-#Specifically, I want to harness the stratefied cross validation as we would like to have the same amount of censoring in each fold.
-#Additionally, we use the one hot encoding function built into caret (dummyVars).
+#We use the one hot encoding function built into caret (dummyVars).
 library(caret)
+#We use this for the build_scales function to apply normalization to variables.
+library(dataPreparation)
 
 #Functions:
 createFoldsAndNormalize = function(survivalDataset, numberOfFolds){
   folds = createFoldsOfData(survivalDataset, numberOfFolds)
   originalIndexing = folds[[1]]
   listOfDatasets = folds[[2]]
-  listOfImputedDatasets = meanImputation(listOfDatasets, numberOfFolds)
-  listOfNormalizedDatasets = normalizeVariables(listOfImputedDatasets, numberOfFolds)
+  listOfImputedDatasets = meanImputation(listOfDatasets)
+  listOfNormalizedDatasets = normalizeVariables(listOfImputedDatasets)
   return(list(originalIndexing, listOfNormalizedDatasets))
 }
 
@@ -58,10 +58,10 @@ createFoldsOfData = function(survivalDataset, numberOfFolds){
   return(list(foldIndex,listOfDatasets))
 }
 
-meanImputation = function(listOfDatasets, numberOfFolds){
+meanImputation = function(listOfDatasets){
   #Here we take the means (numeric variables) and modes (factor variables) of the training and data and impute the training AND the 
   #testing data with the same mean/mode of the respective training data.
-  for(i in 1:numberOfFolds){
+  for(i in 1:length(listOfDatasets$Training)){
     train = listOfDatasets$Training[[i]]
     test = listOfDatasets$Testing[[i]]
     #Note that we are also imputing time and delta, but validation removed all NA instances of time and delta so we are really imputing 
@@ -118,9 +118,9 @@ meanImputation = function(listOfDatasets, numberOfFolds){
   return(listOfDatasets)
 }
 
-normalizeVariables = function(listOfImputedDatasets, numberOfFolds){
+normalizeVariables = function(listOfImputedDatasets){
   listOfNormalizedDatasets = list()
-  for(i in 1:numberOfFolds){
+  for(i in 1:length(listOfImputedDatasets$Training)){
     train = listOfImputedDatasets$Training[[i]]
     test = listOfImputedDatasets$Testing[[i]]
     #We need to remove time an delta so they don't get normalized. Here we set them apart and make an indicator for their location.
@@ -133,9 +133,12 @@ normalizeVariables = function(listOfImputedDatasets, numberOfFolds){
     trainEncoded = predict(oneHotEncoder, train[-timeDeltaInd])
     testEncoded = predict(oneHotEncoder, test[-timeDeltaInd])
     
-    trainCentered = cbind.data.frame(timeDeltaTrain,scale(trainEncoded))
-    testCentered = cbind.data.frame(timeDeltaTest,scale(testEncoded))
+    scales = build_scales(trainEncoded, verbose = F)
+    trainCentered = cbind.data.frame(timeDeltaTrain,fastScale(trainEncoded, scales=scales, verbose=F))
+    testCentered = cbind.data.frame(timeDeltaTest,fastScale(testEncoded, scales=scales,verbose=F))
     
+    #If a variable had zero variance in the test set we will end up dividing by 0 and getting NaN values.
+    #Here we simply make everything 0, the mean value, if this occurs.
     trainCentered = apply(trainCentered,2, function(x){
       if(all(is.nan(x))) 
         return(rep(0,length(x)))
