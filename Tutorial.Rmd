@@ -1739,45 +1739,167 @@ OneCalibrationCumulative(listOfSurvivalModels = coxList, timeOfInterest = 2, typ
 
 ##Brier Score (BrierScore.R)
 
+```{r, include=FALSE}
+#Library dependencies:
+#prodlim gives a faster KM implementation and also gives a predict function for KM
+library(prodlim)
+#Helper functions:
+source("ISDEvaluationPipeline/Evaluations/EvaluationHelperFunctions.R")
+
+BrierScore = function(survMod, type = "Integrated", singleBrierTime = NULL, integratedBrierTimes = NULL, numPoints=NULL){
+  #Being passed an empty model.
+  if(is.null(survMod)) return(NULL)
+  #Being passed a model that failed.
+  suppressWarnings(if(is.na(survMod[[1]])) return(NULL))
+  if(type == "Integrated" & is.null(integratedBrierTimes))
+    integratedBrierTimes = c(0, max(c(survMod[[2]]$time, survMod[[3]]$time))) #max time of the training and testing set combined (the entire dataset).
+  score = ifelse(type =="Single",
+                 singleBrier(survMod, singleBrierTime),
+                 integratedBrier(survMod, integratedBrierTimes, numPoints))
+  return(score)
+}
+
+singleBrier = function(survMod, singleBrierTime){
+  eventTimes = survMod[[2]]$time
+  censorStatus = survMod[[2]]$delta
+  trainingEventTimes = survMod[[3]]$time
+  trainingCensorStatus = survMod[[3]]$delta
+  #Default brier time will be the 50th quantile of training and testing event times combined.
+  if(is.null(singleBrierTime)){
+    singleBrierTime = quantile(c(eventTimes, trainingEventTimes), .5)
+  }
+  inverseCensorTrain = 1 - trainingCensorStatus
+  invProbCensor = prodlim(Surv(trainingEventTimes,inverseCensorTrain)~1)
+  #Here we are ordering event times and then using predict with level.chaos = 1 which returns predictions ordered by time.
+  orderOfTimes = order(eventTimes)
+  #Category one is individuals with event time lower than the time of interest and were NOT censored.
+  weightCat1 = (eventTimes[orderOfTimes] <= singleBrierTime & censorStatus[orderOfTimes])*predict(invProbCensor,
+                                                                                            eventTimes,
+                                                                                            level.chaos = 1)
+  #Catch if event times goes over max training event time, i.e. predict gives NA
+  weightCat1[is.na(weightCat1)] = 0
+  #Category 2 is individuals whose time was greater than the time of interest (singleBrierTime) - both censored and uncensored individuals.
+  weightCat2 = (eventTimes[orderOfTimes] > singleBrierTime)*predict(invProbCensor,
+                                                                    singleBrierTime,
+                                                              level.chaos = 1)
+  #predict returns NA if the passed in time is greater than any of the times used to build the inverse probability of censoring model.
+  weightCat2[is.na(weightCat2)] = 0
+  
+  predictedTimes = survMod[[1]][,1]
+  #Take the survival curves, remove the times column, and then order the curves by the order in which they died. We have to order them to 
+  #line up with the weight vectors.
+  survivalCurvesOrdered = survMod[[1]][,-1][orderOfTimes]
+  predictions = apply(survivalCurvesOrdered,2, function(z) predictProbabilityFromCurve(z,predictedTimes,singleBrierTime))
+  bScore = mean(predictions^2*weightCat1 + (1-predictions)^2*weightCat2)
+  return(bScore)
+}
+
+#integrated Brier Score based on the single time point brier score, found above.
+integratedBrier = function(survMod, integratedBrierTimes,numPoints){
+  censorStatus = survMod[[2]]$delta
+  eventTimes = survMod[[2]]$time[censorStatus==1]
+  orderOfTimes = order(eventTimes)
+  sortedEvents = sort(eventTimes)
+  if(is.null(numPoints)){
+    points = sortedEvents[sortedEvents >= integratedBrierTimes[1] & sortedEvents <=integratedBrierTimes[2]]
+  } else{
+    points = seq(integratedBrierTimes[1], integratedBrierTimes[2], length.out = numPoints)
+  }
+  bscores = singleBrierMultiplePoints(survMod,points)
+  indexs = 2:length(points)
+  trapezoidIntegralVal = diff(points) %*% ((bscores[indexs - 1] + bscores[indexs])/2)
+  intBScore = trapezoidIntegralVal/diff(range(points))
+  return(intBScore)
+}
+
+singleBrierMultiplePoints = function(survMod, BrierTimes){
+  eventTimes = survMod[[2]]$time
+  censorStatus = survMod[[2]]$delta
+  trainingEventTimes = survMod[[3]]$time
+  trainingCensorStatus = survMod[[3]]$delta
+  inverseCensorTrain = 1 - trainingCensorStatus
+  invProbCensor = prodlim(Surv(trainingEventTimes,inverseCensorTrain)~1)
+  orderOfTimes = order(eventTimes)
+
+  bsPointsMat = matrix(rep(BrierTimes, length(eventTimes)), nrow = length(eventTimes),byrow = T)
+  
+  #Each column represents the indicator for a single brier score 
+  weightCat1Mat = (eventTimes[orderOfTimes] <= bsPointsMat & censorStatus[orderOfTimes])*predict(invProbCensor, eventTimes, level.chaos = 1)
+  #Catch if event times goes over max training event time, i.e. predict gives NA
+  weightCat1Mat[is.na(weightCat1Mat)] = 0
+
+  weightCat2Mat = t(t((eventTimes[orderOfTimes] > bsPointsMat))*predict(invProbCensor, BrierTimes,level.chaos = 2))
+  #Catch if BrierTimes goes over max event time, i.e. predict gives NA
+  weightCat2Mat[is.na(weightCat2Mat)] = 0
+  
+  predictedTimes = survMod[[1]][,1]
+  #Take the survival curves, remove the times column, and then order the curves by the order in which they died. We have to order them to
+  #line up with the weight matricies.
+  survivalCurvesOrdered = survMod[[1]][,-1][orderOfTimes]
+  predictions = t(apply(survivalCurvesOrdered,2, function(curve) predictProbabilityFromCurve(curve,predictedTimes,BrierTimes)))
+  bscores = apply(predictions^2*weightCat1Mat + (1-predictions)^2*weightCat2Mat, 2, mean)
+  return(bscores)
+}
+```
+
 **File Purpose**: Evaluate the Brier score on test data.
 
 **File Path**: "ISDEvaluationPipeline/Evaluations/BrierScore.R"
 
 **Functions**:
 
-1. *OneCalibration(survMod, timeOfInterest = c(), type = "DN", numBuckets = 10)*
-2. *OneCalibrationCumulative(listOfSurvivalModels, timeOfInterest = c(), type = "DN", numBuckets = 10)*
-3. *binItUp(trueDeathTimes,censorStatus, predictions, type, numBuckets,timeOfInterest)*
+1. *BrierScore(survMod. type = "Interated", singleTime = NULL, integratedBrierTimes = NULL, numPoints = NULL)*
+2. *singleBrier(survMod, BrierTime = NULL)*
+3. *integratedBrier(survMod, integratedBrierTimes, numPoints)*
+4. *sinleBrierMultiplePoints(survMod, BrierTimes)*
 
 **Arguments**:
 
 1. *survMod*: The output of any of the survival models. Specifically this must be a list of (1) the survival curves of the test patients, (2) the test patients true time of death and censor status, and (3) the training patients true time of death and censor status. Technically the third component is not required for the concordance calcualtion.
 
-2. *timeOfInterest*: The time at which to evaluate the model for 1-Calibration. If nothing is passed in the quantiles (.1, .25,.5,.75,.9) of the true evennt times will be used.
+2. *type*: A string of either "Integrated" or "Single". This will indicate whether to return the Brier score for a point or the integrated Brier score.
 
-3. *type*: This is the type of 1-Calibration to be used, either "Uncensored" to use 1-Calibration for only the uncensored patients and discard all censored patients or "DN" for the D'Agostino-Nam translation.
+3. *singleBrierTime*: The time point to evaluate the (non-integrated) Brier score. If left as NULL, the 50th percentile of the training and testing data's event times combined will be used.
 
-4. *numBuckets*: The number of buckets/bins to use for 1-Calibration.
+4. *integratedBrierTimes*: A vector of length 2 indicating the limits of integration for the integrated Brier score. If left as NULL the range will be from zero to the max event time of the entire dataset (training and testing set combined).
 
-5. *listOfSurvivalModels*: A list of the output of survival models, *e.g.* a list of different *survMod* like objects.
+5. *numPoints*: The number of points to evaluate the integral, *i.e.* the higher the number of points the less error in the integration. If left as NULL the number of points will correspond to the number of events between the limits of integration.
 
-6. *trueDeathTimes*: The true event times of the subjects.
-
-7. *censorStatus*: The bit identifying if a patient died or was censored, *i.e* **delta**.
-
-8. *predictions*: The predicted survival probability for patients at their true event times.
+6. *BrierTimes*: A vector of times to evaluate a single Brier score -- used in an internal function (*singleBrierMultiplePoints()*) of *integratedBrier()*.
 
 **Packages Required**: 
 
-1. survival -- This package is used for the *Surv()* function.
-
-2. dplyr -- This is used for *group_by()*, *summarise()*, aand *mutate()*.
+1. prodlim -- Used for the *prodlim()* function that calcuates the Kaplan-Meier curve. This is then used for the inverse probability of censoring weights (IPCW).
 
 **File Notes**: 
 
-There are two ways to perform 1-Calibration here -- one can either pass the output from a survival model and have 1-Calibration evaluated on the test fold or one can pass a list of multiple survival models and have 1-Calibration evaluated on all patients. Note by doing the first way, *OneCalibration()*, there will end up being the same number of p-values as there are cross-validation folds and there will be no straightforward way of combining them (DO NOT AVERAGE THEM). *OneCalibrationCumulative()* mitigates this by taking in the model results from all folds and performing a single 1-Calibration test using all the test data. *binItUp()* is a helper function that takes probability predictions and performs the actual specified 1-Calibration test.
+In this file *BrierScore()* is the only function that needs to be called -- all the other functions simply work within *BrierScore()*. Note that there is no option for removing censored patients and the Brier score returned will always be the score corrected by the IPCWs. For the integrated Brier score the integral is evaluated using the simple [trapezoidal rule](https://en.wikipedia.org/wiki/Trapezoidal_rule). If numPoints is specified then the points where the Brier score is evaluated will be evenly spread across the limits of integration. However, if numPoints is not specified then the points evaluated will be the event times in the testing data. These rules follow from the *sbrier()* function in the ipred library written by Torsten Hothorn.
 
 **Example Usage**:
+
+
+```{r, warning=FALSE}
+#Set up:
+validatedAndCleaned = validateAndClean(survivalDataset = NACD)
+folds = createFoldsAndNormalize(survivalDataset = validatedAndCleaned, numberOfFolds = 5)
+trainAndTest = folds[[2]]
+training1stFold = trainAndTest$Training[[1]]
+testing1stFold = trainAndTest$Testing[[1]]
+CoxMod = CoxPH_KP(training1stFold, testing1stFold, ElasticNet=F)
+
+#Evaluation:
+#Integrated with specified times:
+BrierScore(CoxMod, type = "Integrated", integratedBrierTimes = c(0,36))
+
+#Integrated with unspecified times:
+BrierScore(CoxMod, type = "Integrated")
+
+#Single with specified times:
+BrierScore(CoxMod, type = "Single", singleBrierTime = 12)
+
+#Single with unspecified times:
+BrierScore(CoxMod, type = "Single")
+```
 
 ##L1-Loss (L1Measures.R) 
 
