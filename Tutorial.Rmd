@@ -9,7 +9,10 @@ output:
     fig_caption: yes
     fig_align: "center"
 ---
-
+```{r, include = FALSE}
+library(plyr)
+library(dplyr)
+```
 
 This article will serve as a tutorial for the code which accompanies the paper "Effective Ways to Build and Evaluate Individual Survival Distributions" by Haider et al. The goal here is not only to show how one may make their own experiments but also address specific implementation details which would have been too cumbersome to include in the original paper. The outline of this tutorial is as follows: COME UP WITH SOMETHING.
 
@@ -1243,6 +1246,7 @@ trainAndTest = folds[[2]]
 training1stFold = trainAndTest$Training[[1]]
 testing1stFold = trainAndTest$Testing[[1]]
 mtlrMod = MTLR(training1stFold, testing1stFold, addLastTimePoint = FALSE)
+
 curves = mtlrMod[[1]]
 row.names(curves) = NULL
 curves
@@ -1911,7 +1915,7 @@ library(survival)
 #We use this for the prodlim function.
 library(prodlim)
 #Helper Functions: predictMeanSurvivalTimeSpline(survivalCurve,predictedTimes)
-source("Evaluations/EvaluationHelperFunctions.R")
+source("ISDEvaluationPipeline/Evaluations/EvaluationHelperFunctions.R")
 
 L1 = function(survMod, type = "Uncensored", logScale = F, method = "Mean"){
   #Being passed an empty model.
@@ -2047,6 +2051,205 @@ L1(CoxMod, type = "Margin", logScale = TRUE, method = "Median")
 ```
 
 ##D-Calibration (DCalibration.R)
+
+
+```{r, include = FALSE}
+#Library Dependencies
+#We use this for the sindex function.
+library(prodlim)
+#We use this for ldply, a combiner of lists.
+library(plyr)
+#Helper Functions: predictProbabilityFromCurve(survivalCurve,predictedTimes, timeToPredict)
+source("ISDEvaluationPipeline/Evaluations/EvaluationHelperFunctions.R")
+
+DCalibration = function(survMod, numBins){
+  #Being passed an empty model.
+  if(is.null(survMod)) return(NULL)
+  #Being passed a model that failed.
+  suppressWarnings(if(is.na(survMod[[1]])) return(NULL))
+  combinedBins = getBinned(survMod, numBins)
+  pvalue = chisq.test(combinedBins)$p.value
+  return(pvalue)
+}
+
+DCalibrationCumulative = function(listOfSurvivalModels, numBins){
+  if(length(listOfSurvivalModels) == 0) return(NULL)
+  suppressWarnings(if(any(unlist(lapply(listOfSurvivalModels, is.na)))) return(NA))
+  #Here we apply getBinned to every survival model, stack the bins into a matrix, and sum the columns to get the total bin values.
+  combinedBins =colSums(ldply(lapply(seq_along(listOfSurvivalModels), function(x) getBinned(listOfSurvivalModels[[x]], numBins)), rbind))
+  pvalue = chisq.test(combinedBins)$p.value
+  return(pvalue)
+}
+
+
+getBinned = function(survMod,numBins){
+  predictedTimes = survMod[[1]][,1]
+  survivalCurves = survMod[[1]][-1]
+  trueDeathTimes = survMod[[2]]$time
+  censorStatus = survMod[[2]]$delta
+  quantiles = 1 - seq(0,1,length.out = numBins+1)
+  #This retrieves the death probability the survival curve gave at the true time of death.
+  deathProbabilities = unlist(lapply(seq_along(trueDeathTimes),
+                                     function(index) predictProbabilityFromCurve(survivalCurves[,index],
+                                                                                 predictedTimes,
+                                                                                 trueDeathTimes[index])))
+  uncensoredProbabilities = deathProbabilities[as.logical(censorStatus)]
+  binIndex = seq_along(quantiles)[-1]
+  uncensoredBinning = unlist(lapply(binIndex, function(x) length(which(uncensoredProbabilities >= quantiles[x] &
+                                                                         uncensoredProbabilities < quantiles[x-1]))))
+  censoredProbabilities = deathProbabilities[as.logical(1-censorStatus)]
+  censoredBinPositions = sindex(quantiles,censoredProbabilities, comp = "greater", strict = T)
+  #Sometimes the probability will be 1 in which case we just want to put them in the first bin. 
+  censoredBinPositions = ifelse(censoredBinPositions ==0, 1,censoredBinPositions)
+  quantileWidth = 1/numBins
+  firstBin = ifelse(censoredBinPositions == numBins,1,(censoredProbabilities - quantiles[censoredBinPositions+1])/censoredProbabilities)
+  restOfBins = ifelse(censoredProbabilities ==0,1,1/(numBins*censoredProbabilities))
+
+  listOfContributions = lapply(seq_along(censoredBinPositions),function(x) c(rep(0, censoredBinPositions[x] -1),
+                                                                             rep(firstBin[x],1),
+                                                                             rep(restOfBins[x], numBins - censoredBinPositions[x])))
+  censoredBinning = colSums(ldply(listOfContributions,rbind))
+  combinedBins = uncensoredBinning + censoredBinning
+  names(combinedBins) = quantiles[-length(quantiles)]
+  return(combinedBins)
+}
+
+getBinnedForHistorgram = function(survMod,numBins){
+  predictedTimes = survMod[[1]][,1]
+  survivalCurves = survMod[[1]][-1]
+  trueDeathTimes = survMod[[2]]$time
+  censorStatus = survMod[[2]]$delta
+  quantiles = 1 - seq(0,1,length.out = numBins+1)
+  #This retrieves the death probability the survival curve gave at the true time of death.
+  deathProbabilities = unlist(lapply(seq_along(trueDeathTimes),
+                                     function(index) predictProbabilityFromCurve(survivalCurves[,index],
+                                                                                 predictedTimes,
+                                                                                 trueDeathTimes[index])))
+  uncensoredProbabilities = deathProbabilities[as.logical(censorStatus)]
+  binIndex = seq_along(quantiles)[-1]
+  uncensoredBinning = unlist(lapply(binIndex, function(x) length(which(uncensoredProbabilities >= quantiles[x] &
+                                                                         uncensoredProbabilities < quantiles[x-1]))))
+  censoredProbabilities = deathProbabilities[as.logical(1-censorStatus)]
+  censoredBinPositions = sindex(quantiles,censoredProbabilities, comp = "greater", strict = T)
+  #Sometimes the probability will be 1 in which case we just want to put them in the first bin. 
+  censoredBinPositions = ifelse(censoredBinPositions ==0, 1,censoredBinPositions)
+  quantileWidth = 1/numBins
+  firstBin = ifelse(censoredBinPositions == numBins,1,(censoredProbabilities - quantiles[censoredBinPositions+1])/censoredProbabilities)
+  restOfBins = ifelse(censoredProbabilities ==0,1,1/(numBins*censoredProbabilities))
+
+  listOfContributions = lapply(seq_along(censoredBinPositions),function(x) c(rep(0, censoredBinPositions[x] -1),
+                                                                             rep(firstBin[x],1),
+                                                                             rep(restOfBins[x], numBins - censoredBinPositions[x])))
+  censoredBinning = colSums(ldply(listOfContributions,rbind))
+  DCalDat = cbind.data.frame(Bin = quantiles[-length(quantiles)], Uncensored=  uncensoredBinning, Censored = censoredBinning)
+  return(DCalDat)
+}
+
+```
+
+**File Purpose**: Evaluate test data using D-Calibration.
+
+**File Path**: "ISDEvaluationPipeline/Evaluations/DCalibration.R"
+
+**Functions**:
+
+1. *DCalibration(survMod, numBins)*
+
+2. *DCalibrationCumulative(listOfSurivalModels, numBins)*
+
+3. *getBinned(survMod, numBins)*
+
+**Arguments**:
+
+1. *survMod*: The output of any of the survival models. Specifically this must be a list of (1) the survival curves of the test patients, (2) the test patients true time of death and censor status, and (3) the training patients true time of death and censor status. Technically the third component is not required for the concordance calcualtion.
+
+2. *numBins*: The number of bins to use for D-calibration.
+
+3. *listOfSurvivalModels*: A list of the output of survival models, *e.g.* a list of different *survMod* like objects.
+
+**Packages Required**: 
+
+1. prodlim -- Used for the *sindex()* function.
+
+2. plyr -- Used for the *ldply()* function to combine lists.
+
+**File Notes**: 
+
+The format of the DCalibration.R file follows the same as OneCalibration.R. That is, *DCalibration()* is used for a single fold and returns a *p*-value. However, since *p*-values should not be averaged there is also a *DCalibrationCumulative()* function which will take all the folds test data and perform a single D-Calibration test. Lastly, *getBinned()* is a helper function for *DCalibration()* and *DCalibrationCumulative()* and does not need to be called directly. 
+
+**Example Usage**:
+
+Here we do two models, Cox and MTLR. Below you will see that the Cox model fails whereas MTLR performs well. Additionally we show the corresponding cumulaitve D-Calibration histograms for each model.
+
+```{r, warning=FALSE}
+#Set up:
+validatedAndCleaned = validateAndClean(survivalDataset = NACD)
+folds = createFoldsAndNormalize(survivalDataset = validatedAndCleaned, numberOfFolds = 5)
+trainAndTest = folds[[2]]
+training1stFold = trainAndTest$Training[[1]]
+testing1stFold = trainAndTest$Testing[[1]]
+CoxMod = CoxPH_KP(training1stFold, testing1stFold, ElasticNet=F)
+
+setwd("./ISDEvaluationPipeline")
+MTLRMod = MTLR(training1stFold, testing1stFold)
+
+#D-Calibration for Cox
+DCalibration(CoxMod, numBins = 10)
+
+#D-Calibration for MTLR
+DCalibration(MTLRMod, numBins = 10)
+
+
+#Set up for DCalibrationCumulative():
+coxList = list()
+mtlrList = list()
+for(i in 1:5){
+  trainingFold = trainAndTest$Training[[i]]
+  testingFold = trainAndTest$Testing[[i]]
+  CoxMod = CoxPH_KP(trainingFold, testingFold, ElasticNet=F)
+  coxList[[i]] = CoxMod
+  
+  MTLRMod = MTLR(trainingFold, testingFold)
+  mtlrList[[i]] = MTLRMod
+}
+#Cumulative D-Calibration for cox
+DCalibrationCumulative(listOfSurvivalModels = coxList, numBins = 10)
+```
+
+<center>
+```{r, echo = FALSE}
+forHist = ldply(lapply(seq_along(coxList), function(x) getBinnedForHistorgram(coxList[[x]], 10)), rbind) %>% 
+  group_by(Bin) %>% 
+  summarise(Uncen = sum(Uncensored)/128, Cen = sum(Censored)/128)
+library(lattice)
+barchart(Bin~Uncen+Cen,data=forHist,
+         stack=T,
+         auto.key = list(space='right',cex=.8,text=c('Uncensored','Censored')),
+         xlab = "Proportion of Patients",
+         scales=list(y=list(tick.number = 160)))
+```
+</center>
+<figcaption>Figure: Histogram for D-Calibration corresponding to Cox model. Bin 1 refers to the [0,.1) bin and Bin 10 refers to the [0.9, 1] bin. Here we see the cox model puts too many of the patients in the first and last bin -- leading to a failed D-Calibration test. </figcaption>
+
+```{r}
+DCalibrationCumulative(listOfSurvivalModels = mtlrList, numBins = 10)
+```
+
+<center>
+```{r, echo = FALSE}
+forHist = ldply(lapply(seq_along(coxList), function(x) getBinnedForHistorgram(mtlrList[[x]], 10)), rbind) %>% 
+  group_by(Bin) %>% 
+  summarise(Uncen = sum(Uncensored)/128, Cen = sum(Censored)/128)
+library(lattice)
+barchart(Bin~Uncen+Cen,data=forHist,
+         stack=T,
+         auto.key = list(space='right',cex=.8,text=c('Uncensored','Censored')),
+         xlab = "Proportion of Patients",
+         scales=list(y=list(tick.number = 160)))
+```
+</center>
+
+<figcaption>Figure: Histogram for D-Calibration corresponding to MTLR model. Bin 1 refers to the [0,.1) bin and Bin 10 refers to the [0.9, 1] bin. The bins are much more even here than those given by the Cox model, resulting in a passed D-Calibration test. </figcaption>
 
 
 
