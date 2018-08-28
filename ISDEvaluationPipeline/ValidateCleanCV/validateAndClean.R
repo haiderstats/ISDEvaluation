@@ -93,11 +93,6 @@ clean = function(survivalDataset){
     warning(paste("The variable(s)",paste(namesToRemoveNA, collapse = ", "),"contained over 25% NA values. They have been removed.\n",
                   sep = " "))
   }
-  indicatorVariables = sapply(survivalDataset[,-c(1,2)], function(x) all(unique(x)[!is.na(unique(x))] %in% c(0,1)) || all(unique(x)[!is.na(unique(x))] %in% c(-1,0)))
-  if(any(indicatorVariables)){
-  survivalDataset[,-c(1,2)][,indicatorVariables] = lapply(survivalDataset[,-c(1,2)][,indicatorVariables], factor)
-  warning(paste(toString(names(survivalDataset[-c(1,2)][indicatorVariables])), "had only unique values c(0,1) or c(-1,0). These were converted to factors.",sep = " "))
-  }
   return(survivalDataset)
 }
 

@@ -67,53 +67,31 @@ meanImputation = function(listOfDatasets){
     #Note that we are also imputing time and delta, but validation removed all NA instances of time and delta so we are really imputing 
     #nothing.
     
-    #For numeric variables:
-    trainNumeric = train[,sapply(train,is.numeric), drop = FALSE]
-    #drop = FALSE makes it stay as a dataframe instead of turning to a vector in the event there is only 1 variable with the condition.
-    testNumeric = test[,sapply(test,is.numeric), drop = FALSE]
-    varMeans = apply(trainNumeric,2,function(x) mean(x, na.rm = T))
-    trainNumericImputed = apply(trainNumeric, 2, function(x) ifelse(is.na(x),mean(x, na.rm = T),x))
+    #We need to remove time an delta so they don't get one hot encoded (the names would change).
+    #Here we set them apart and make an indicator for their location.
+    timeDeltaInd = which(names(train) %in% c("time","delta"))
+    #fullRank =T drops one of the extra columns for the one-hot encoding.
+    oneHotEncoder = dummyVars("~.",data = rbind.data.frame(test,train)[-timeDeltaInd], fullRank = T)
+    trainEncoded = predict(oneHotEncoder, train[-timeDeltaInd])
+    testEncoded = predict(oneHotEncoder, test[-timeDeltaInd])
+    
+    varMeans = apply(trainEncoded,2,function(x) mean(x, na.rm = T))
+    trainImputed = as.data.frame(apply(trainEncoded, 2, function(x) ifelse(is.na(x),mean(x, na.rm = T),x)))
+    
     #The function is more complex for test because we have to specify the means and sd of the TRAINING set as we go through 
     #the columns of the test set.
-    testNumericImputed = as.data.frame(sapply(1:length(varMeans), function(x) ifelse(is.na(testNumeric[,x]),varMeans[x],testNumeric[,x])))
-    #Names are getting lost in sapply
-    names(testNumericImputed) = names(testNumeric)
+    testImputed = as.data.frame(sapply(1:length(varMeans), function(x) ifelse(is.na(testEncoded[,x]),varMeans[x],testEncoded[,x])))
     
+    #We need to make sure that there is no comma in any of the file names or this can wreck functions using csvs.
+    #We will search for these and remove them. Ideally we could do this once for the entire dataset but this would require
+    #checking all variables and then all the levels of all the factor variables. Since this is linear in the number of 
+    #features this check shouldn't be computationally difficult so we will do the "lazy" way and check for commas here 
+    #and remove them for every fold.
+    names(trainImputed) = make.names(names(trainImputed), unique = T)
+    names(testImputed) = make.names(names(trainImputed), unique = T)
     
-    #For factor variables:
-    trainFactor = train[,sapply(train,is.factor),drop=FALSE]
-    testFactor = test[,sapply(test,is.factor),drop=FALSE]    
-    if(ncol(trainFactor) > 0){
-      #We need to introduce a mode function to find the mode of the factor variables.
-      Mode <- function(x) {
-        #Modified from https://stackoverflow.com/questions/2547402/is-there-a-built-in-function-for-finding-the-mode
-        x = x[!is.na(x)]
-        ux <- unique(x)
-        ux[which.max(tabulate(match(x, ux)))]
-      }
-      varModes = apply(trainFactor,2,function(x) Mode(x))
-      trainFactorListed = lapply(trainFactor, as.character)
-      trainFactorImputed = as.data.frame(lapply(trainFactorListed, function(x) ifelse(is.na(x), Mode(x), x)))
-      #We run into problems if the training dataset didn't have a factor level in it which was included in the 
-      #original dataset. Here we are just adding back the original factor levels.
-      for(j in 1:ncol(trainFactorImputed)){
-        missedLevels = levels(trainFactor[,j])[which(!levels(trainFactor[,j]) %in% levels(trainFactorImputed[,j]))]
-        levels(trainFactorImputed[,j]) = c(levels(trainFactorImputed[,j]), missedLevels)
-      }
-      testFactorImputed = as.data.frame(sapply(1:length(varModes),
-                                               function(x) factor(ifelse(is.na(testFactor[,x]),
-                                                                         varModes[x],
-                                                                         paste(testFactor[,x])),
-                                                                  levels = levels(trainFactorImputed[,x]))))
-      names(testFactorImputed) = names(testFactor)
-      #Combine numeric and factor variables and save over the previous datasets.
-      listOfDatasets$Training[[i]] = cbind.data.frame(trainNumericImputed, trainFactorImputed)
-      listOfDatasets$Testing[[i]] = cbind.data.frame(testNumericImputed, testFactorImputed)
-    }
-   else{
-     listOfDatasets$Training[[i]] = as.data.frame(trainNumericImputed)
-     listOfDatasets$Testing[[i]] = as.data.frame(testNumericImputed)
-   }
+    listOfDatasets$Training[[i]] = cbind.data.frame(train[,timeDeltaInd], trainImputed)
+    listOfDatasets$Testing[[i]] = cbind.data.frame(test[,timeDeltaInd], testImputed)
   }
   return(listOfDatasets)
 }
@@ -128,14 +106,9 @@ normalizeVariables = function(listOfImputedDatasets){
     timeDeltaTrain = train[,timeDeltaInd]
     timeDeltaTest = test[,timeDeltaInd]
     
-    #fullRank =T drops one of the extra columns for the one-hot encoding.
-    oneHotEncoder = dummyVars("~.",data = train[-timeDeltaInd], fullRank = T)
-    trainEncoded = predict(oneHotEncoder, train[-timeDeltaInd])
-    testEncoded = predict(oneHotEncoder, test[-timeDeltaInd])
-    
-    scales = build_scales(trainEncoded, verbose = F)
-    trainCentered = cbind.data.frame(timeDeltaTrain,fastScale(trainEncoded, scales=scales, verbose=F))
-    testCentered = cbind.data.frame(timeDeltaTest,fastScale(testEncoded, scales=scales,verbose=F))
+    scales = build_scales(train[-timeDeltaInd], verbose = F)
+    trainCentered = cbind.data.frame(timeDeltaTrain,fastScale(train[-timeDeltaInd], scales=scales, verbose=F))
+    testCentered = cbind.data.frame(timeDeltaTest,fastScale(test[-timeDeltaInd], scales=scales,verbose=F))
     
     #If a variable had zero variance in the test set we will end up dividing by 0 and getting NaN values.
     #Here we simply make everything 0, the mean value, if this occurs.
@@ -152,13 +125,6 @@ normalizeVariables = function(listOfImputedDatasets){
 
     listOfNormalizedDatasets$Training[[i]] = as.data.frame(trainCentered)
     listOfNormalizedDatasets$Testing[[i]] = as.data.frame(testCentered)
-    #We need to make sure that there is no comma in any of the file names or this can wreck functions using csvs.
-    #We will search for these and remove them. Ideally we could do this once for the entire dataset but this would require
-    #checking all variables and then all the levels of all the factor variables. Since this is linear in the number of 
-    #features this check shouldn't be computationally difficult so we will do the "lazy" way and check for commas here 
-    #and remove them for every fold.
-    names(listOfNormalizedDatasets$Training[[i]]) = make.names(names(listOfNormalizedDatasets$Training[[i]]),unique=T)
-    names(listOfNormalizedDatasets$Testing[[i]]) = make.names(names(listOfNormalizedDatasets$Testing[[i]]),unique=T)
     }
 
   return(listOfNormalizedDatasets)
