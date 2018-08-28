@@ -48,7 +48,7 @@ DCalibrationCumulative = function(listOfSurvivalModels, numBins){
 }
 
 
-getBinned = function(survMod,numBins, weighted = F){
+getBinned = function(survMod,numBins){
   predictedTimes = survMod[[1]][,1]
   survivalCurves = survMod[[1]][-1]
   trueDeathTimes = survMod[[2]]$time
@@ -76,6 +76,7 @@ getBinned = function(survMod,numBins, weighted = F){
                                                                              rep(restOfBins[x], numBins - censoredBinPositions[x])))
   censoredBinning = colSums(ldply(listOfContributions,rbind))
   combinedBins = uncensoredBinning + censoredBinning
+  names(combinedBins) = quantiles[-length(quantiles)]
   return(combinedBins)
 }
 
