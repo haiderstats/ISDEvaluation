@@ -16,7 +16,7 @@ FeatureSelection = function(dataset, type ="UniCox", obs_thresh = 0, pThresh = 0
                          toSelect = as.data.frame(predict(oneHotEncoder, dataset))
                          toKeepFactor = which(!names(toSelect) %in% names(dataset))
                          toSelect[,toKeepFactor] = lapply(toSelect[,toKeepFactor],function(x)as.factor(x))
-                         names(toSelect) = gsub("[^[:alnum:]]","",names(toSelect))
+                         names(toSelect) = make.names(names(toSelect), unique = T)
                          uniCox(toSelect, obs_thresh, pThresh)
                         }
   )
