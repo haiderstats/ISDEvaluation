@@ -1903,6 +1903,148 @@ BrierScore(CoxMod, type = "Single")
 
 ##L1-Loss (L1Measures.R) 
 
+```{r, include = FALSE}
+##############################################################################################################################################
+#Library Dependencies
+#We need the Surv function from survival for the prodlim implementation of Kaplan Meier
+library(survival)
+#We use this for the prodlim function.
+library(prodlim)
+#Helper Functions: predictMeanSurvivalTimeSpline(survivalCurve,predictedTimes)
+source("Evaluations/EvaluationHelperFunctions.R")
+
+L1 = function(survMod, type = "Uncensored", logScale = F, method = "Mean"){
+  #Being passed an empty model.
+  if(is.null(survMod)) return(NULL)
+  #Being passed a model that failed.
+  suppressWarnings(if(is.na(survMod[[1]])) return(NULL))
+  predictedTimes = survMod[[1]]$time
+  survivalCurves = survMod[[1]][-1]
+  trueDeathTimes = survMod[[2]]$time
+  censorStatus = survMod[[2]]$delta
+  censorTimes = trueDeathTimes[as.logical(1-censorStatus)]
+  trainingDeathTimes = survMod[[3]]$time
+  trainingCensorStatus = survMod[[3]]$delta
+  
+  predictMethod = switch(method,
+                         Mean = predictMeanSurvivalTimeSpline,
+                         Median = predictMedianSurvivalTimeSpline)
+  averageUncensored = unlist(lapply(which(as.logical(censorStatus)),
+                                    function(index) predictMethod(survivalCurves[,index],
+                                                                                  predictedTimes)))
+  
+  averageCensored = unlist(lapply(which(as.logical(1-censorStatus)),
+                                  function(index) predictMethod(survivalCurves[,index],
+                                                                                predictedTimes)))
+  #Sometimes the mean is infinite or extrememly, unreasonable large. Since this  will largely sway the L1 measure, we enforce that 
+  #a model cannot predict a value higher than the end of the KM curve with the linear extension since this is what we believe to be 
+  #the "true" survival curve of the population. 
+  KMCurve = prodlim(Surv(trainingDeathTimes, trainingCensorStatus)~1)
+  KMLinearZero = -1/((1-min(KMCurve$surv))/(0 - max(KMCurve$time)))
+  #If every patient is censored we choose the last time point to be the maximum time.
+  if(is.infinite(KMLinearZero))
+    KMLinearZero = max(KMCurve$time)
+  averageUncensored = pmin(averageUncensored, KMLinearZero)
+  averageCensored = pmin(averageCensored, KMLinearZero)
+  
+  
+  uncensoredPiece = ifelse(!logScale,
+                           sum(abs(trueDeathTimes[as.logical(censorStatus)] - averageUncensored)),
+                           sum(abs(log(trueDeathTimes[as.logical(censorStatus)]) - log(averageUncensored))))
+  L1Measure = switch(type,
+                     Uncensored = {
+                       L1Measure = (1/sum(censorStatus))*uncensoredPiece
+                     },
+                     Hinge = {
+
+                       hingePiece = ifelse(!logScale,
+                                           censorTimes - averageCensored,
+                                           log(censorTimes) - log(averageCensored))
+                       hingePieceCorrected = ifelse(hingePiece >=0, hingePiece,0)
+                       L1Measure = (1/(length(censorStatus)))*(uncensoredPiece + hingePieceCorrected)                     
+                    },
+                     Margin = {
+                       KMLinearPredict = function(time){
+                         prediction = predict(KMCurve,time)
+                         slope = (1-min(KMCurve$surv))/(0 - max(KMCurve$time))
+                         predictedProbabiliteis = ifelse(is.na(prediction), pmax(1+time*slope,0), prediction)
+                         return(predictedProbabiliteis)
+                       }
+                       bestGuess = unlist(lapply(censorTimes,
+                              function(time) time + integrate(KMLinearPredict,
+                                                              lower = time, 
+                                                              upper = KMLinearZero,subdivisions = 2000,
+                                                              rel.tol = .01)[[1]]/KMLinearPredict(time)))
+                       bestGuess = ifelse(is.nan(bestGuess),0,bestGuess)
+                       weights = 1- KMLinearPredict(censorTimes)
+                       marginPiece = ifelse(!logScale,
+                                            #Use weights!=0 incase there is an infinitiy, we don't get NaN.
+                                            sum(weights*(abs(bestGuess - averageCensored))),
+                                            sum(weights*(abs(log(bestGuess) - log(averageCensored))))
+                       )
+                       L1Measure = (1/sum(censorStatus))*(uncensoredPiece) + (1/sum(weights))*marginPiece
+                     }
+  )
+  return(L1Measure)
+}
+```
+
+**File Purpose**: Evaluate the L1 loss on test data.
+
+**File Path**: "ISDEvaluationPipeline/Evaluations/L1Measures.R"
+
+**Functions**:
+
+1. *L1(survMod. type = "Uncensored", logScale = FALSE, method = "Mean")*
+
+**Arguments**:
+
+1. *survMod*: The output of any of the survival models. Specifically this must be a list of (1) the survival curves of the test patients, (2) the test patients true time of death and censor status, and (3) the training patients true time of death and censor status. Technically the third component is not required for the concordance calcualtion.
+
+2. *type*: A string indicating the type of L1-loss, options are one of "Uncensored", "Hinge", or "Margin". See the paper for details regarding the mathematical definition of each option.
+
+3. *logScale*: A Boolean indicating whether to use the log scaled version of the L1-loss.
+
+4. *method*: A string indicating whether to use the "Mean" or "Median" as survival predictions.
+
+**Packages Required**: 
+
+1. prodlim -- Used for the *prodlim()* function that calcuates the Kaplan-Meier curve. See File Notes for more details.
+
+2. survival -- Used for the *Surv()* function.
+
+**File Notes**: 
+
+*L1()* returns the average L1 loss based on the specifications given, *e.g* the Margin L1-loss using the mean survival to compute the loss. There is one important specification to note -- the Kaplan-Meier curve is generated (from the training data) and is completed using the linear extension as specfied in Section 4.1 above. The mean of this Kaplan-Meier curve is computed and the survival estimate returned is the minimum of the mean survival time for individual survival curves and the mean of this Kaplan-Meier curve. See lines #45 - #54 of L1Measures.R for the implementation details.
+
+**Example Usage**:
+
+
+```{r, warning=FALSE}
+#Set up:
+validatedAndCleaned = validateAndClean(survivalDataset = NACD)
+folds = createFoldsAndNormalize(survivalDataset = validatedAndCleaned, numberOfFolds = 5)
+trainAndTest = folds[[2]]
+training1stFold = trainAndTest$Training[[1]]
+testing1stFold = trainAndTest$Testing[[1]]
+CoxMod = CoxPH_KP(training1stFold, testing1stFold, ElasticNet=F)
+
+#Evaluation:
+#Uncensored Loss with Mean:
+L1(CoxMod, type = "Uncensored", logScale = FALSE, method = "Mean")
+
+#Hinge Loss with Mean:
+L1(CoxMod, type = "Hinge", logScale = FALSE, method = "Mean")
+
+#Margin Loss with Mean:
+L1(CoxMod, type = "Margin", logScale = FALSE, method = "Mean")
+
+#Margin Loss with Median:
+L1(CoxMod, type = "Margin", logScale = FALSE, method = "Median")
+
+#Margin Loss with Median on Log Scale:
+L1(CoxMod, type = "Margin", logScale = TRUE, method = "Median")
+```
 
 ##D-Calibration (DCalibration.R)
 
