@@ -5,9 +5,10 @@
 
 #Purpose and General Comments:
 #This file was created to implement multiple L measures (L1, L1 hinge, L1 margin) as an evaluation metric for individual survival curves.
-#Input 1: A list of (1) a matrix of survival curves, and (2) the true death times and event/censoring indicator (delta =1 implies death/event).
-#Input 2: A string specifying the type of L1, options being "Uncensored","hinge", or "margin". 
-#Input 3: A boolean saying whether or not to use log scale, default is FALSE.
+# survMod: A list of (1) a matrix of survival curves, and (2) the true death times and event/censoring indicator (delta =1 implies death/event).
+# type: A string specifying the type of L1, options being "Uncensored","Hinge", or "Margin". 
+# logScale: A boolean saying whether or not to use log scale, default is FALSE.
+# method: A string specifying to use the "Mean" or "Median" as the predicted survival time.
 #Output: The desired L1 measure value.
 ##############################################################################################################################################
 #Library Dependencies
@@ -15,8 +16,6 @@
 library(survival)
 #We use this for the prodlim function.
 library(prodlim)
-#We use this for ldply, a combiner of lists.
-library(plyr)
 #Helper Functions: predictMeanSurvivalTimeSpline(survivalCurve,predictedTimes)
 source("Evaluations/EvaluationHelperFunctions.R")
 
