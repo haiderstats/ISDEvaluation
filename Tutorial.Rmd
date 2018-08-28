@@ -160,11 +160,6 @@ clean = function(survivalDataset){
     warning(paste("The variable(s)",paste(namesToRemoveNA, collapse = ", "),"contained over 25% NA values. They have been removed.\n",
                   sep = " "))
   }
-  indicatorVariables = sapply(survivalDataset[,-c(1,2)], function(x) all(unique(x)[!is.na(unique(x))] %in% c(0,1)) || all(unique(x)[!is.na(unique(x))] %in% c(-1,0)))
-  if(any(indicatorVariables)){
-  survivalDataset[,-c(1,2)][,indicatorVariables] = lapply(survivalDataset[,-c(1,2)][,indicatorVariables], factor)
-  warning(paste(toString(names(survivalDataset[-c(1,2)][indicatorVariables])), "had only unique values c(0,1) or c(-1,0). These were converted to factors.",sep = " "))
-  }
   return(survivalDataset)
 }
 ```
@@ -174,7 +169,6 @@ Here, *clean()* does a very minimal amount of cleaning on the survival dataset. 
 
 1. A variable contains all unique values. For example, in our NACD dataset there is a **STAGE_4** variable which is an indicator (1 or 0) whether or not the cancer is in stage 4. Since we only have stage 4 stomach cancer patients this variable will be be all 1s and will be removed from the dataset.
 2. Variables such that 25% of rows (patients) have a missing value will be removed. However, the coding of missing data must be such that is.na() would identify the data as missing. For example is.na("") returns TRUE even though an empty string likely indicates a missing value.
-3. Often if a factor (nominal) variable only contains two values (say Male and Female) individuals will not change this to explicitly be a factor and leave the variable in terms of 1s and 0s. However, if these variables also contain missing values this will create weird behaviors when doing imputations, e.g. a missing value would be imputed as the average gender *e.g* 0.7 which is meaningless. For this reason we MAKE THE ASSUMPTION that all variables which only contain non-NA unique values of c(0,1) or c(0,-1) are actually factor variables and this change is made to the data.
 
 Whenever a variable is removed or turned into a factor, *clean()* will return a warning indicating the name of the variable(s) which were removed/factored. For example, on our validated NACD dataset we can now call *clean()*:
 
@@ -2251,13 +2245,227 @@ barchart(Bin~Uncen+Cen,data=forHist,
 
 <figcaption>Figure: Histogram for D-Calibration corresponding to MTLR model. Bin 1 refers to the [0,.1) bin and Bin 10 refers to the [0.9, 1] bin. The bins are much more even here than those given by the Cox model, resulting in a passed D-Calibration test. </figcaption>
 
-
-
 #Miscellanious
 
 ##Plotting Individual Survival Curves (plotSurvivalCurves.R)
 
+```{r, include = FALSE}
+library(ggplot2)
+library(reshape2)
+plotSurvivalCurves = function(survivalCurves, indexToPlot = 1, color = c(), xlim = c()){
+  colorOK = T
+  if(length(color) == 0)
+    colorOK = F
+  else if(length(color) != length(indexToPlot)){
+    warning("If you would like to select custom colors please make sure the number of colors
+            matches the number of curves.")
+    colorOK =F 
+  }
+  time = survivalCurves$time
+  curves = survivalCurves[,indexToPlot +1,drop=F]
+  plotTimes = seq(min(time),max(time), length.out = length(time)*20)
+  plotProbs = as.data.frame(sapply(curves,
+                                   function(curve){
+                                     curve = ifelse(curve < 1e-20,0,curve)
+                                     survivialSpline = splinefun(time, curve, method = "hyman")
+                                     return(pmax(survivialSpline(plotTimes),0))
+                                   }
+  ))
+  data = cbind.data.frame(plotTimes,plotProbs)
+  longFormData = melt(data,measure.vars = names(data)[-1], variable.name = "Index")
+  plot = ggplot(data = longFormData, aes(x = plotTimes,y = value, colour = Index))+
+    geom_line(size = 1.5)
+  if(colorOK)
+    plot = plot + scale_color_manual(values = color) 
+  if(length(xlim)==2){
+    plot = plot+ xlim(c(xlim[1],xlim[2]))
+  }
+  plot = plot +scale_y_continuous( limits= c(0,1),breaks = c(0,.1,.2,.3,.4,.5,.6,.7,.8,.9,1))+
+    theme_bw() +
+    theme(text = element_text(size=18, face=  "bold"),
+          axis.title = element_text(size = 20),
+          axis.title.x = element_text(margin = margin(t = 15)),
+          axis.title.y = element_text(margin = margin(r = 15))) + 
+    labs(y = "Survival Probaility",x = "Time" )
+
+  return(plot)
+}
+
+
+```
+
+**File Purpose**: Plot individual survival curves.
+
+**File Path**: "ISDEvaluationPipeline/Plotting/plotSurvivalCurves.R"
+
+**Functions**:
+
+1. *plotSurvivalCurves(survivalCurves, indexToPlot, color = c(), xlim=c())*
+
+**Arguments**:
+
+1. *survivalCurves*: A dataframe where the first column corresponds to survival times and all other columns are survival probabilities of individual patients. This corresponds to the first item of the list returned by all models, *e.g.* *CoxPH_KP()*.
+
+2. *indexToPlot*: The patient number you wish to plot. From *survivalCurves* patient 1 would be the second column. This can either be an integer specifiying which patient or a vector of integers, specifying multuple patients.
+
+3. *color*: The color of the survival curves. The length much match that of *indexToPlot*.
+
+4. *xlim*: You can specify the range of the x-axis. This should be a vector of length two.
+
+**Packages Required**: 
+
+1. ggplot2 -- Used for plotting.
+
+2. reshape2 -- Used to reshape the data to long form.
+
+**File Notes**: 
+
+The plotting code will select the columns specified by indexToPlot and fit a spline using the time column and the survival probabilities columns. This spline is then used to interpolate many points between the probabilities such that we have a smooth fit to plot. See below for a few plotting examples. Note that *indexToPlot* will match up testing data depending on the fold. 
+
+**Example Usage**:
+
+
+```{r, warning=FALSE}
+#Without feature selection.
+validatedAndCleaned = validateAndClean(survivalDataset = NACD)
+folds = createFoldsAndNormalize(survivalDataset = validatedAndCleaned, numberOfFolds = 5)
+trainAndTest = folds[[2]]
+training1stFold = trainAndTest$Training[[1]]
+testing1stFold = trainAndTest$Testing[[1]]
+CoxMod = CoxPH_KP(training1stFold, testing1stFold, ElasticNet=F)
+survivalCurves = CoxMod[[1]]
+plotSurvivalCurves(survivalCurves, indexToPlot = 1)
+
+plotSurvivalCurves(survivalCurves, indexToPlot = 2)
+
+plotSurvivalCurves(survivalCurves, indexToPlot = 2, color = "blue")
+
+plotSurvivalCurves(survivalCurves, indexToPlot = 1:10)
+
+plotSurvivalCurves(survivalCurves, indexToPlot = 1:10, xlim = c(0,25))
+
+```
+
 ##Feature Selection (FeatureSelection.R)
+
+```{r, include = FALSE}
+#Library Dependencies
+library(caret)
+FeatureSelection = function(dataset, type ="UniCox", obs_thresh = 0, pThresh = 0.1){
+  selectedData = switch(type,
+                        UniCox = {
+                         oneHotEncoder = dummyVars("~.",data = dataset, fullRank = T)
+                         toSelect = as.data.frame(predict(oneHotEncoder, dataset))
+                         toKeepFactor = which(!names(toSelect) %in% names(dataset))
+                         toSelect[,toKeepFactor] = lapply(toSelect[,toKeepFactor, drop = FALSE],function(x)as.factor(x))
+                         names(toSelect) = make.names(names(toSelect), unique = T)
+                         uniCox(toSelect, obs_thresh, pThresh)
+                        }
+  )
+}
+
+#The following function was developed by Bret Hoehn (bhoehn@ualberta.ca) at some date and given to Humza Haider for doing feature selection.
+#Humza then made some modifications from the original and this modified version is given below.
+#Here we are simply seeing if variables are significant in a univariate cox model. If the p-value is below a specified value (default is 0.1),
+#Then it is returned in the dataset, otherwise it is removed.
+uniCox <- function(dataset, obs_thresh=0, pThresh = 0.1){
+  # select variables with p-val < 0.1 via univariate Cox
+
+  # determine the threshold for whether or not a variable is acceptable (each allowed value should correspond to a
+  #minimum number of observations)
+  num_obs = sum(dataset$delta)
+  num_obs_thresh = num_obs*obs_thresh
+  
+  min_val <- pThresh
+  min_var <- ""
+  chosen_vars <- c()   
+  var_names = names(dataset)[-which(names(dataset) %in% c("time","delta"))]
+  for (var_name in var_names){
+    formula = as.formula(paste("Surv(time, delta) ~", var_name))
+    unique_vals = unique(dataset[[var_name]])
+    cox.fit <- coxph(formula, data = dataset, singular.ok = TRUE)
+    
+    min_obs_restriction_met=TRUE
+    if (length(unique_vals)<=3){
+      # check if each setting of this variable satisfies the required number of observed events
+      for (val in unique_vals){
+        dset_valIdx = (dataset[[var_name]]==val)
+        num_obs_val = sum(dataset$delta[dset_valIdx],na.rm=T)
+        if (num_obs_val < num_obs_thresh)
+          min_obs_restrictionMet=FALSE
+      }
+    }
+    
+    #get the p-value of this feature
+    if (min_obs_restriction_met==FALSE){
+        print(paste(var_name," does not have the required number of observations for each value setting"))
+        pValue <- 1
+      }
+      else {
+        pValue <- summary(cox.fit)$coefficients[,5]
+      }
+    if (is.nan(pValue) | is.na(pValue)) {
+      pValue <- 1
+    }
+    if (pValue < min_val) {
+      min_val <- pValue
+      min_var <- var_name
+    }
+    
+    if (!is.nan(pValue) && pValue < 0.1 & !is.na(pValue)){
+      chosen_vars <- c(chosen_vars, var_name)
+    }
+  }
+  if (length(chosen_vars) == 0) {
+    print(paste("All features eliminated by univariate selection, including ", min_var, " by default"))
+    chosen_vars <- c(min_var)
+  }
+  chosenVarIndex = which(names(dataset) %in% c("time","delta",chosen_vars))
+  return (dataset[,chosenVarIndex])
+}
+```
+
+**File Purpose**: Perform feature selection on survival data.
+
+**File Path**: "ISDEvaluationPipeline/FeatureSelection/FeatureSelection.R"
+
+**Functions**:
+
+1. *FeatureSelection(dataset, type = "UniCox", obs_thresh = 0, pThresh = 0.1)*
+
+2. *uniCox(dataset, obsthresh = 0, pThresh=0.1)*
+
+**Arguments**:
+
+1. *dataset*: This is a dataset which has been validated for use -- i.e. gone through *validateAndClean()*
+
+2. *type*: The type of feature selection to use. Currently (August 28, 2018) the only option is "UniCox". See File Notes for details.
+
+3. *obs_thresh*: The number of observations that a variable must have to qualify for selection.
+
+4. *pThresh*: The p-value threshold to be included in the analysis.
+
+**Packages Required**: 
+
+1. caret -- the dummyVars function is used for oneHotEncodings.
+
+**File Notes**: 
+
+The code here is written so custom feature selection methods can be easily added -- they just have to added to a switch command. Here we use univariate cox for our feature selection -- the details of this method are given in the paper. For this feature selection we first check that that each variable has a *obs_thresh* number of events (deaths) occur. The default for this is 0 events. Next the p-value for the feature must be below 0.1 to be included in the selected dataset. Note that variables are one-hot encoded before selection so all the values of a categorical variable may not be present post feature selection.
+
+**Example Usage**:
+
+Below you will see that unselected data has 40 features whereas the data post feature selection has only 22 features.
+
+```{r, warning=FALSE}
+#Without feature selection.
+validatedAndCleaned = validateAndClean(survivalDataset = NACD)
+dim(validatedAndCleaned)
+
+#After we have the selected data we would then pass it to createFoldsAndNormalize().
+selectedData = FeatureSelection(validatedAndCleaned)
+dim(selectedData)
+```
 
 #The Code - From Beginning To End 
 
