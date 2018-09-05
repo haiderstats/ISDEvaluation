@@ -29,7 +29,7 @@ MTLR = function(training, testing,addLastTimePoint=F){
   system2("./mtlr_opt",args=c("-i", "training.mtlr"),stdout = FALSE)
   system2("./mtlr_test", args=c("-i", "testing.mtlr", "-s","training.mtlr", "-o", "./fold1_modelfile > MTLR_output.txt"))
   times = unlist((unname(read.table("fold1_modelfile",skip = 1,sep = ",",nrows = 1))))
-  if(!addLastTimePoint){
+  if(addLastTimePoint){
     #It appears the last survival probability is always appearing to be zero. We need to add some additional time point to the end to account
     #for this so we choose the value of the last time point  squared divided by the second to last time point. 
     lastTimePoint = round(times[length(times)]^2/times[length(times) -1])

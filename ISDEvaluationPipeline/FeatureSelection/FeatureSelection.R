@@ -15,7 +15,7 @@ FeatureSelection = function(dataset, type ="UniCox", obs_thresh = 0, pThresh = 0
                          oneHotEncoder = dummyVars("~.",data = dataset, fullRank = T)
                          toSelect = as.data.frame(predict(oneHotEncoder, dataset))
                          toKeepFactor = which(!names(toSelect) %in% names(dataset))
-                         toSelect[,toKeepFactor] = lapply(toSelect[,toKeepFactor],function(x)as.factor(x))
+                         toSelect[,toKeepFactor] = lapply(toSelect[,toKeepFactor, drop = FALSE],function(x)as.factor(x))
                          names(toSelect) = make.names(names(toSelect), unique = T)
                          uniCox(toSelect, obs_thresh, pThresh)
                         }

@@ -19,7 +19,7 @@ plotSurvivalCurves = function(survivalCurves, indexToPlot = 1, color = c(), xlim
   }
   time = survivalCurves$time
   curves = survivalCurves[,indexToPlot +1,drop=F]
-  plotTimes = seq(min(time),max(time), length.out = length(time)*20)
+  plotTimes = seq(min(time),max(time), length.out = length(time)*100)
   plotProbs = as.data.frame(sapply(curves,
                                    function(curve){
                                      curve = ifelse(curve < 1e-20,0,curve)
