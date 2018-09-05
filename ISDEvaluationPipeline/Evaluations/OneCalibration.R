@@ -38,7 +38,7 @@ OneCalibration = function(survMod, timeOfInterest = c(), type = "DN", numBuckets
   trainingCensorStatus = survMod[[3]]$delta
   #If time is null, we will select the median from the KM curve generated from training instances.
   if(is.null(timeOfInterest)){
-    timeOfInterest = unname(quantile(trueDeathTimes,c(.1,.25,.5,.75,.9)))
+    timeOfInterest = unname(quantile(c(trueDeathTimes,trainingDeathTimes),c(.1,.25,.5,.75,.9)))
   }
   predictions = unlist(lapply(seq_along(trueDeathTimes),
                               function(index) predictProbabilityFromCurve(survivalCurves[,index],
