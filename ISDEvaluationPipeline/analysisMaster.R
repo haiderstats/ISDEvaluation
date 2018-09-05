@@ -36,13 +36,14 @@ source("Evaluations/BrierScore.R")
 
 #Misc files:
 source("FeatureSelection/FeatureSelection.R")
+source("Plotting/plotSurvivalCurves.R")
 
 analysisMaster = function(survivalDataset, numberOfFolds,
                           CoxKP = T,CoxKPEN = T, KaplanMeier = T, RSFModel = T, AFTModel = T, MTLRModel =T, #Models
                           DCal = T, OneCal = T, Concor = T, L1Measure = T, Brier = T, #Evaluations
                           DCalBins = 10, OneCalTime = NULL,  concordanceTies = "Risk", #Evaluation args
                           BrierTime = NULL, numBrierPoints = 1000, Ltype = "Margin", Llog = F, #Evaluation args
-                          typeOneCal = "BucketKM", oneCalBuckets = 10, survivalPredictionMethod = "Mean", #Evaluation args
+                          typeOneCal = "DN", oneCalBuckets = 10, survivalPredictionMethod = "Mean", #Evaluation args
                           AFTDistribution = "weibull", ntree = 1000, #Model args,
                           FS = T, imputeZero=T # Misc args
                           ){
@@ -120,43 +121,15 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     #Evaluations - Note that if evaluations are passed a NULL value they return a NULL.
     DCalResults = NULL;OneCalResults = NULL;ConcCensResults = NULL;ConcUncensResults = NULL;
     BrierResultsInt = NULL;BrierResultsSingle = NULL;L1Results = NULL; L2Results = NULL; 
-    if(DCal){
-      print("Staring Evaluation: D-Calibration")
-      coxDcal = DCalibration(coxMod, DCalBins)
-      coxENDcal = DCalibration(coxENMod, DCalBins)
-      kmDcal = DCalibration(kmMod, DCalBins)
-      rsfDcal = DCalibration(rsfMod, DCalBins)
-      aftDcal = DCalibration(aftMod, DCalBins)
-      mtlrDcal = DCalibration(mtlrMod, DCalBins)
-      DCalResults = rbind(coxDcal,coxENDcal, kmDcal, rsfDcal, aftDcal,mtlrDcal)
-    }
-    if(OneCal){
-      print("Staring Evaluation: One-Calibration")
-      coxOneCal = OneCalibration(coxMod, OneCalTime, typeOneCal, oneCalBuckets)
-      coxENOneCal = OneCalibration(coxENMod, OneCalTime, typeOneCal, oneCalBuckets)
-      kmOneCal = OneCalibration(kmMod, OneCalTime, typeOneCal, oneCalBuckets)
-      rsfOneCal = OneCalibration(rsfMod, OneCalTime, typeOneCal, oneCalBuckets)
-      aftOneCal = OneCalibration(aftMod, OneCalTime, typeOneCal, oneCalBuckets)
-      mtlrOneCal = OneCalibration(mtlrMod, OneCalTime, typeOneCal, oneCalBuckets)
-      OneCalResults = rbind(coxOneCal,coxENOneCal, kmOneCal, rsfOneCal,aftOneCal, mtlrOneCal)
-    }
     if(Concor){
       print("Staring Evaluation: Concordance")
-      coxConcCens = Concordance(coxMod, concordanceTies, T,survivalPredictionMethod)
-      coxENConcCens = Concordance(coxENMod, concordanceTies, T,survivalPredictionMethod)
-      kmConcCens = Concordance(kmMod, concordanceTies, T,survivalPredictionMethod)
-      rsfConcCens = Concordance(rsfMod, concordanceTies, T,survivalPredictionMethod)
-      aftConcCens = Concordance(aftMod, concordanceTies, T,survivalPredictionMethod)
-      mtlrConcCens = Concordance(mtlrMod, concordanceTies, T,survivalPredictionMethod)
+      coxConcUncens = Concordance(coxMod, concordanceTies,survivalPredictionMethod)
+      coxENConcUncens = Concordance(coxENMod, concordanceTies,survivalPredictionMethod)
+      kmConcUncens = Concordance(kmMod, concordanceTies,survivalPredictionMethod)
+      rsfConcUncens = Concordance(rsfMod, concordanceTies,survivalPredictionMethod)
+      aftConcUncens = Concordance(aftMod, concordanceTies,survivalPredictionMethod)
+      mtlrConcUncens = Concordance(mtlrMod, concordanceTies,survivalPredictionMethod)
       
-      coxConcUncens = Concordance(coxMod, concordanceTies, F,survivalPredictionMethod)
-      coxENConcUncens = Concordance(coxENMod, concordanceTies, F,survivalPredictionMethod)
-      kmConcUncens = Concordance(kmMod, concordanceTies, F,survivalPredictionMethod)
-      rsfConcUncens = Concordance(rsfMod, concordanceTies, F,survivalPredictionMethod)
-      aftConcUncens = Concordance(aftMod, concordanceTies, F,survivalPredictionMethod)
-      mtlrConcUncens = Concordance(mtlrMod, concordanceTies, F,survivalPredictionMethod)
-      
-      ConcCensResults = rbind(coxConcCens, coxENConcCens,kmConcCens, rsfConcCens, aftConcCens, mtlrConcCens)
       ConcUncensResults = rbind(coxConcUncens,coxENConcUncens, kmConcUncens, rsfConcUncens, aftConcUncens, mtlrConcUncens)
     }
     if(Brier){
@@ -170,22 +143,6 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       
       BrierResultsInt = rbind(coxBrierInt,coxENBrierInt, kmBrierInt, rsfBrierInt, aftBrierInt, mtlrBrierInt)
       
-      BrierTimes = quantile(validatedData$time, c(.1,.25,.5,.75,.9))
-      coxBrierS = sapply(BrierTimes, function(x) BrierScore(coxMod, type = "Single",singleTime = x))
-      coxENBrierS = sapply(BrierTimes, function(x) BrierScore(coxENMod, type = "Single",singleTime = x))
-      kmBrierS = sapply(BrierTimes, function(x) BrierScore(kmMod, type = "Single",singleTime = x))
-      rsfBrierS = sapply(BrierTimes, function(x) BrierScore(rsfMod, type = "Single",singleTime = x))
-      aftBrierS = sapply(BrierTimes, function(x) BrierScore(aftMod, type = "Single",singleTime = x))
-      mtlrBrierS =sapply(BrierTimes, function(x) BrierScore(mtlrMod, type = "Single",singleTime = x))
-
-      numBrierTimes = max(sapply(list(coxBrierS,coxENBrierS, kmBrierS, rsfBrierS,aftBrierS, mtlrBrierS),length))
-      BrierResultsSingle = data.frame(row.names = 1:sum(c(CoxKP,CoxKPEN, KaplanMeier, RSFModel, AFTModel, MTLRModel)))
-      for(times in 1:numBrierTimes){
-        varName = paste("BrierResultsSingle",times, sep="")
-        currentNames = names(BrierResultsSingle)
-        BrierResultsSingle = cbind.data.frame(BrierResultsSingle, rbind.data.frame(coxBrierS[times],coxENBrierS[times], kmBrierS[times], rsfBrierS[times],aftBrierS[times], mtlrBrierS[times]))
-        names(BrierResultsSingle) = c(currentNames, varName)
-      }
     }
     if(L1Measure){
       print("Staring Evaluation: L1 Loss")
@@ -198,11 +155,11 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       
       L1Results = rbind(coxL1,coxENL1,kmL1,rsfL1,aftL1,mtlrL1)
     }
-    toAdd = as.data.frame(cbind(DCalResults, OneCalResults, ConcCensResults,ConcUncensResults,
-                                BrierResultsInt,BrierResultsSingle, L1Results))
-    metricsRan = c(DCal, OneCal, Concor,Concor,Brier,rep(Brier,numBrierTimes), L1Measure)
-    names(toAdd) = c("DCalibration","OneCalibration","ConcordanceCensored","ConcordanceUncensensored",
-                     "BrierResultsInt",names(BrierResultsSingle), "L1Results")[metricsRan]
+    toAdd = as.data.frame(cbind(ConcUncensResults,
+                                BrierResultsInt, L1Results))
+    metricsRan = c(Concor,Brier, L1Measure)
+    names(toAdd) = c("ConcordanceUncensensored",
+                     "BrierResultsInt", "L1Results")[metricsRan]
     modelsRan = c(CoxKP,CoxKPEN, KaplanMeier, RSFModel, AFTModel, MTLRModel)
     models = c("CoxKP","CoxKPEN","Kaplan-Meier","RSF","AFT", "MTLR")[modelsRan]
     toAdd = cbind.data.frame(Model = models,FoldNumer = i, toAdd)
