@@ -107,8 +107,18 @@ normalizeVariables = function(listOfImputedDatasets){
     timeDeltaTest = test[,timeDeltaInd]
     
     scales = build_scales(train[-timeDeltaInd], verbose = F)
-    trainCentered = cbind.data.frame(timeDeltaTrain,fastScale(train[-timeDeltaInd], scales=scales, verbose=F))
-    testCentered = cbind.data.frame(timeDeltaTest,fastScale(test[-timeDeltaInd], scales=scales,verbose=F))
+    zeroVarianceFeatures = which(unlist(scales)[seq(2,length(unlist(scales)),by=2)]== 0)
+    normalizedTrain = fastScale(train[-timeDeltaInd], scales=scales, verbose=F)
+    normalizedTest = fastScale(test[-timeDeltaInd], scales=scales,verbose=F)
+    #Note that if there is zero variance in a feature of the training set the models *should* be assigning it a weight of zero, thus
+    #the variable shouldn't matter. Regardless, we turn these values back into an "unormalized" version -- note the normalized version is 
+    #NaN since the sd would be zero, i.e. we are dividing by 0. Dividing by 0 is bad for your health and safety.
+    if(length(zeroVarianceFeatures) > 0){
+      normalizedTrain[,zeroVarianceFeatures] = train[-timeDeltaInd][,zeroVarianceFeatures]
+      normalizedTest[,zeroVarianceFeatures] = test[-timeDeltaInd][,zeroVarianceFeatures]
+    }
+    trainCentered = cbind.data.frame(timeDeltaTrain, normalizedTrain)
+    testCentered = cbind.data.frame(timeDeltaTest,normalizedTest)
     
     #If a variable had zero variance in the test set we will end up dividing by 0 and getting NaN values.
     #Here we simply make everything 0, the mean value, if this occurs.
