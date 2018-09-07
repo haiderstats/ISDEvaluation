@@ -19,7 +19,7 @@ library(prodlim)
 #Helper Functions: predictMeanSurvivalTimeSpline(survivalCurve,predictedTimes)
 source("Evaluations/EvaluationHelperFunctions.R")
 
-L1 = function(survMod, type = "Uncensored", logScale = F, method = "Mean"){
+L1 = function(survMod, type = "Margin", logScale = F, method = "Mean"){
   #Being passed an empty model.
   if(is.null(survMod)) return(NULL)
   #Being passed a model that failed.
