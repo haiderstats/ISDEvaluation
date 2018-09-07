@@ -36,14 +36,3 @@ RSF = function(training, testing, ntree){
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
   return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))  
 }
-
-
-
-
-
-
-
-
-
-
-

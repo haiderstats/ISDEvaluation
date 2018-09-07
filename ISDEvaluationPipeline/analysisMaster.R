@@ -313,9 +313,3 @@ getSurvivalCurves = function(coxTimes,coxENTimes, kmTimes, aftTimes, rsfTimes, m
   }
   return(survivalCurves)
 }
-
-
-
-
-
-

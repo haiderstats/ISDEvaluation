@@ -140,11 +140,3 @@ binItUp = function(trueDeathTimes,censorStatus, predictions, type, numBuckets,ti
                 })
   return(pval)
 }
-
-
-
-
-
-
-
-

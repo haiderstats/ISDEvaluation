@@ -82,14 +82,3 @@ MTLR = function(training, testing,addLastTimePoint=F){
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
   return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))  
 }
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-

@@ -31,6 +31,3 @@ KM = function(training, testing){
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
   return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))   
 }
-
-
-

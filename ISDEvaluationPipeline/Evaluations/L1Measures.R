@@ -93,10 +93,3 @@ L1 = function(survMod, type = "Margin", logScale = F, method = "Mean"){
   )
   return(L1Measure)
 }
-
-
-
-
-
-
-

@@ -62,11 +62,3 @@ Concordance = function(survMod, ties = "None", method = "Mean"){
   )
   return(CIndex)
 }
-
-
-
-
-
-
-
-

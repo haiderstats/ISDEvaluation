@@ -80,4 +80,3 @@ KPEstimator = function(lp,lpTime,censorStatus){
   return(list(time = lpTime[orderLPTime][indexToKeep],surv = survivalFunc[indexToKeep]))
 }
 
-

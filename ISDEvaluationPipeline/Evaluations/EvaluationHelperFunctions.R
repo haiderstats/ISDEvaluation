@@ -67,9 +67,3 @@ predictMedianSurvivalTimeSpline = function(survivalCurve, predictedTimes){
   }
   return(medianProbabilityTime)
 }
-
-
-
-
-
-
