@@ -80,9 +80,3 @@ getBinned = function(survMod,numBins){
   return(combinedBins)
 }
 
-
-
-
-
-
-
