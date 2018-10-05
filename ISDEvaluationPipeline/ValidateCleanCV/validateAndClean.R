@@ -70,17 +70,18 @@ validate = function(survivalDataset,imputeZero){
   }
   if(length(unique(survivalDataset$delta)) >2)
     stop("'delta' contains more than two unique values. 'delta' should only contain 0 and 1.\n")
-  if(!all(sort(unique(survivalDataset$delta)) == c(0,1)))
+  if(!all(sort(unique(survivalDataset$delta)) %in% c(0,1)))
     stop("'delta' contains values other than 0 and 1. 0 should indicate RIGHT censoring and 1 should indicate the event occuring.\n")
   return(survivalDataset)
 }
 
 clean = function(survivalDataset){
+  timeDeltaInd = which(names(survivalDataset) %in% c("time","delta"))
   #Remove columns with no variance.
-  allSame = nearZeroVar(survivalDataset,freqCut = 100/0)
+  allSame = nearZeroVar(survivalDataset[-timeDeltaInd],freqCut = 100/0)
   if(length(allSame)>0){
-    namesToRemoveNoVar = names(survivalDataset)[allSame]
-    survivalDataset = survivalDataset[,-allSame]
+    namesToRemoveNoVar = names(survivalDataset[-timeDeltaInd])[allSame]
+    survivalDataset = cbind.data.frame(survivalDataset[timeDeltaInd],survivalDataset[-timeDeltaInd][,-allSame])
     warning(paste("The variable(s)",paste(namesToRemoveNoVar, collapse = ", "),"contained only 1 unique value. They have been removed.\n",
                   sep = " "))
   }
