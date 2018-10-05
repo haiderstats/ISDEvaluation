@@ -24,7 +24,8 @@ library(survival)
 source("Evaluations/EvaluationHelperFunctions.R")
 
 #The following function is split into 2 parts. Part 1 retrieves all the relevant pieces from the passed in survMod object, e.g. the survival
-#curves and the true death times of test subjects. Part 2 uses survConcordance to calculate classical concordance measures. Additionally, this is were tied data is handled.
+#curves and the true death times of test subjects. Part 2 uses survConcordance to calculate classical concordance measures. Additionally, this
+#is were tied data is handled.
 Concordance = function(survMod, ties = "None", method = "Mean"){
   #Part 1:
   #Being passed an empty model.
