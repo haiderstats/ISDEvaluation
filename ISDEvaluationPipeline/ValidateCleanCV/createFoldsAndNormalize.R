@@ -59,8 +59,9 @@ createFoldsOfData = function(survivalDataset, numberOfFolds){
 }
 
 meanImputation = function(listOfDatasets){
-  #Here we take the means (numeric variables) and modes (factor variables) of the training and data and impute the training AND the 
-  #testing data with the same mean/mode of the respective training data.
+  #Here we take the means of the training and data and impute the training AND the 
+  #testing data with the same mean/mode of the respective training data. Not that factor variables are one-hot encoded and then
+  #the binary vector is where missing values are imputed as the mean value (of the binary vector).
   for(i in 1:length(listOfDatasets$Training)){
     train = listOfDatasets$Training[[i]]
     test = listOfDatasets$Testing[[i]]
