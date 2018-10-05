@@ -110,7 +110,7 @@ validate = function(survivalDataset,imputeZero){
   }
   if(length(unique(survivalDataset$delta)) >2)
     stop("'delta' contains more than two unique values. 'delta' should only contain 0 and 1.\n")
-  if(!all(sort(unique(survivalDataset$delta)) == c(0,1)))
+  if(!all(sort(unique(survivalDataset$delta)) %in% c(0,1)))
     stop("'delta' contains values other than 0 and 1. 0 should indicate RIGHT censoring and 1 should indicate the event occuring.\n")
   return(survivalDataset)
 }
@@ -143,11 +143,12 @@ validatedNACD = validate(NACD, imputeZero = TRUE)
 ```{r, echo = FALSE,message=FALSE}
 library(caret)
 clean = function(survivalDataset){
+  timeDeltaInd = which(names(survivalDataset) %in% c("time","delta"))
   #Remove columns with no variance.
-  allSame = nearZeroVar(survivalDataset,freqCut = 100/0)
+  allSame = nearZeroVar(survivalDataset[-timeDeltaInd],freqCut = 100/0)
   if(length(allSame)>0){
-    namesToRemoveNoVar = names(survivalDataset)[allSame]
-    survivalDataset = survivalDataset[,-allSame]
+    namesToRemoveNoVar = names(survivalDataset[-timeDeltaInd])[allSame]
+    survivalDataset = cbind.data.frame(survivalDataset[timeDeltaInd],survivalDataset[-timeDeltaInd][,-allSame])
     warning(paste("The variable(s)",paste(namesToRemoveNoVar, collapse = ", "),"contained only 1 unique value. They have been removed.\n",
                   sep = " "))
   }
@@ -162,6 +163,7 @@ clean = function(survivalDataset){
   }
   return(survivalDataset)
 }
+
 ```
 
 
@@ -193,7 +195,7 @@ validateAndClean = function(survivalDataset, imputeZero=T){
 This function simply runs both *validate()* and *clean()* on a survivalDataset. Note that here we default imputeZero to be TRUE. Below we verify that *validateAndClean(NACD)* is equivalent to cleanedNACD.
 
 ```{r, warning=FALSE}
-all(validateAndClean(NACD) == cleanedNACD)
+identical(validateAndClean(NACD),cleanedNACD)
 ```
 
 
@@ -272,67 +274,49 @@ dim(trainingAndTestingSets$Testing[[1]])
 
 ```{r, include = FALSE}
 meanImputation = function(listOfDatasets){
-  #Here we take the means (numeric variables) and modes (factor variables) of the training and data and impute the training AND the 
-  #testing data with the same mean/mode of the respective training data.
+  #Here we take the means of the training and data and impute the training AND the 
+  #testing data with the same mean/mode of the respective training data. Not that factor variables are one-hot encoded and then
+  #the binary vector is where missing values are imputed as the mean value (of the binary vector).
   for(i in 1:length(listOfDatasets$Training)){
     train = listOfDatasets$Training[[i]]
     test = listOfDatasets$Testing[[i]]
     #Note that we are also imputing time and delta, but validation removed all NA instances of time and delta so we are really imputing 
     #nothing.
     
-    #For numeric variables:
-    trainNumeric = train[,sapply(train,is.numeric), drop = FALSE]
-    #drop = FALSE makes it stay as a dataframe instead of turning to a vector in the event there is only 1 variable with the condition.
-    testNumeric = test[,sapply(test,is.numeric), drop = FALSE]
-    varMeans = apply(trainNumeric,2,function(x) mean(x, na.rm = T))
-    trainNumericImputed = apply(trainNumeric, 2, function(x) ifelse(is.na(x),mean(x, na.rm = T),x))
+    #We need to remove time an delta so they don't get one hot encoded (the names would change).
+    #Here we set them apart and make an indicator for their location.
+    timeDeltaInd = which(names(train) %in% c("time","delta"))
+    #fullRank =T drops one of the extra columns for the one-hot encoding.
+    oneHotEncoder = dummyVars("~.",data = rbind.data.frame(test,train)[-timeDeltaInd], fullRank = T)
+    trainEncoded = predict(oneHotEncoder, train[-timeDeltaInd])
+    testEncoded = predict(oneHotEncoder, test[-timeDeltaInd])
+    
+    varMeans = apply(trainEncoded,2,function(x) mean(x, na.rm = T))
+    trainImputed = as.data.frame(apply(trainEncoded, 2, function(x) ifelse(is.na(x),mean(x, na.rm = T),x)))
+    
     #The function is more complex for test because we have to specify the means and sd of the TRAINING set as we go through 
     #the columns of the test set.
-    testNumericImputed = as.data.frame(sapply(1:length(varMeans), function(x) ifelse(is.na(testNumeric[,x]),varMeans[x],testNumeric[,x])))
-    #Names are getting lost in sapply
-    names(testNumericImputed) = names(testNumeric)
+    testImputed = as.data.frame(sapply(1:length(varMeans), function(x) ifelse(is.na(testEncoded[,x]),varMeans[x],testEncoded[,x])))
     
+    #We need to make sure that there is no comma in any of the file names or this can wreck functions using csvs.
+    #We will search for these and remove them. Ideally we could do this once for the entire dataset but this would require
+    #checking all variables and then all the levels of all the factor variables. Since this is linear in the number of 
+    #features this check shouldn't be computationally difficult so we will do the "lazy" way and check for commas here 
+    #and remove them for every fold.
+    names(trainImputed) = make.names(names(trainImputed), unique = T)
+    names(testImputed) = make.names(names(trainImputed), unique = T)
     
-    #For factor variables:
-    trainFactor = train[,sapply(train,is.factor),drop=FALSE]
-    testFactor = test[,sapply(test,is.factor),drop=FALSE]    
-    if(ncol(trainFactor) > 0){
-      #We need to introduce a mode function to find the mode of the factor variables.
-      Mode <- function(x) {
-        #Modified from https://stackoverflow.com/questions/2547402/is-there-a-built-in-function-for-finding-the-mode
-        x = x[!is.na(x)]
-        ux <- unique(x)
-        ux[which.max(tabulate(match(x, ux)))]
-      }
-      varModes = apply(trainFactor,2,function(x) Mode(x))
-      trainFactorListed = lapply(trainFactor, as.character)
-      trainFactorImputed = as.data.frame(lapply(trainFactorListed, function(x) ifelse(is.na(x), Mode(x), x)))
-      #We run into problems if the training dataset didn't have a factor level in it which was included in the 
-      #original dataset. Here we are just adding back the original factor levels.
-      for(j in 1:ncol(trainFactorImputed)){
-        missedLevels = levels(trainFactor[,j])[which(!levels(trainFactor[,j]) %in% levels(trainFactorImputed[,j]))]
-        levels(trainFactorImputed[,j]) = c(levels(trainFactorImputed[,j]), missedLevels)
-      }
-      testFactorImputed = as.data.frame(sapply(1:length(varModes),
-                                               function(x) factor(ifelse(is.na(testFactor[,x]),
-                                                                         varModes[x],
-                                                                         paste(testFactor[,x])),
-                                                                  levels = levels(trainFactorImputed[,x]))))
-      names(testFactorImputed) = names(testFactor)
-      #Combine numeric and factor variables and save over the previous datasets.
-      listOfDatasets$Training[[i]] = cbind.data.frame(trainNumericImputed, trainFactorImputed)
-      listOfDatasets$Testing[[i]] = cbind.data.frame(testNumericImputed, testFactorImputed)
-    }
-   else{
-     listOfDatasets$Training[[i]] = as.data.frame(trainNumericImputed)
-     listOfDatasets$Testing[[i]] = as.data.frame(testNumericImputed)
-   }
+    listOfDatasets$Training[[i]] = cbind.data.frame(train[,timeDeltaInd], trainImputed)
+    listOfDatasets$Testing[[i]] = cbind.data.frame(test[,timeDeltaInd], testImputed)
   }
   return(listOfDatasets)
 }
+
 ```
 
-Following the splitting of folds we perform imputation for missing data. Since the primary focus of this work was not in any way geared towards imputation methods we do a very simple mean/mode imputation for missing values WITHIN FOLD. The means for all numerical variables for each training fold are computed and the corresponding test fold is imputed with the mean value from the training fold. Similarly, factor variables are imputed with the mode factor level. Note that by either imputing missing values for the entire dataset or imputing training and test folds seperatly would lead data leakage. Note that **time** and **delta** are not subject to imputation -- if either of these variables contained missing values the entire row was removed in *validate()*.
+Following the splitting of folds we perform imputation for missing data. Since the primary focus of this work was not in any way geared towards imputation methods we do a very basic mean imputation for missing values WITHIN FOLD. The means for all variables for each training fold are computed and the corresponding test fold is imputed with the mean value from the training fold.
+
+In order to impute factor (nominal) variables, we use the one-hot encoding of these variables and then impute missing values with the mean of the one-hot encoded vector. Note that **time** and **delta** are not subject to imputation -- if either of these variables contained missing values the entire row was removed in *validate()*.
 
 Below we would impute missing data, however, the NACD dataset we are using has no missing data so the following step is not necasarry.
 ```{r, echo=TRUE,include=TRUE}
@@ -352,14 +336,19 @@ normalizeVariables = function(listOfImputedDatasets){
     timeDeltaTrain = train[,timeDeltaInd]
     timeDeltaTest = test[,timeDeltaInd]
     
-    #fullRank =T drops one of the extra columns for the one-hot encoding.
-    oneHotEncoder = dummyVars("~.",data = train[-timeDeltaInd], fullRank = T)
-    trainEncoded = predict(oneHotEncoder, train[-timeDeltaInd])
-    testEncoded = predict(oneHotEncoder, test[-timeDeltaInd])
-    
-    scales = build_scales(trainEncoded, verbose = F)
-    trainCentered = cbind.data.frame(timeDeltaTrain,fastScale(trainEncoded, scales=scales, verbose=F))
-    testCentered = cbind.data.frame(timeDeltaTest,fastScale(testEncoded, scales=scales,verbose=F))
+    scales = build_scales(train[-timeDeltaInd], verbose = F)
+    zeroVarianceFeatures = which(unlist(scales)[seq(2,length(unlist(scales)),by=2)]== 0)
+    normalizedTrain = fastScale(train[-timeDeltaInd], scales=scales, verbose=F)
+    normalizedTest = fastScale(test[-timeDeltaInd], scales=scales,verbose=F)
+    #Note that if there is zero variance in a feature of the training set the models *should* be assigning it a weight of zero, thus
+    #the variable shouldn't matter. Regardless, we turn these values back into an "unormalized" version -- note the normalized version is 
+    #NaN since the sd would be zero, i.e. we are dividing by 0. Dividing by 0 is bad for your health and safety.
+    if(length(zeroVarianceFeatures) > 0){
+      normalizedTrain[,zeroVarianceFeatures] = train[-timeDeltaInd][,zeroVarianceFeatures]
+      normalizedTest[,zeroVarianceFeatures] = test[-timeDeltaInd][,zeroVarianceFeatures]
+    }
+    trainCentered = cbind.data.frame(timeDeltaTrain, normalizedTrain)
+    testCentered = cbind.data.frame(timeDeltaTest,normalizedTest)
     
     #If a variable had zero variance in the test set we will end up dividing by 0 and getting NaN values.
     #Here we simply make everything 0, the mean value, if this occurs.
@@ -376,13 +365,6 @@ normalizeVariables = function(listOfImputedDatasets){
 
     listOfNormalizedDatasets$Training[[i]] = as.data.frame(trainCentered)
     listOfNormalizedDatasets$Testing[[i]] = as.data.frame(testCentered)
-    #We need to make sure that there is no comma in any of the file names or this can wreck functions using csvs.
-    #We will search for these and remove them. Ideally we could do this once for the entire dataset but this would require
-    #checking all variables and then all the levels of all the factor variables. Since this is linear in the number of 
-    #features this check shouldn't be computationally difficult so we will do the "lazy" way and check for commas here 
-    #and remove them for every fold.
-    names(listOfNormalizedDatasets$Training[[i]]) = make.names(names(listOfNormalizedDatasets$Training[[i]]),unique=T)
-    names(listOfNormalizedDatasets$Testing[[i]]) = make.names(names(listOfNormalizedDatasets$Testing[[i]]),unique=T)
     }
 
   return(listOfNormalizedDatasets)
@@ -481,9 +463,10 @@ KM = function(training, testing){
   }
   probabilities = predict(kmMod,times)
   curvesToReturn = cbind.data.frame(time = times,matrix(rep(probabilities,nrow(testing)),ncol = nrow(testing)))
+  trainingCurvesToReturn = cbind.data.frame(time = times,matrix(rep(probabilities,nrow(training)),ncol = nrow(training)))
   timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
-  return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))   
+  return(list(TestCurves = curvesToReturn, TestData = timesAndCensTest,TrainData = timesAndCensTrain,TrainCurves= trainingCurvesToReturn)) 
 }
 ```
 
@@ -507,9 +490,16 @@ KM = function(training, testing){
 
 **File Notes**:
 
-Given the list of datasets generated by *createFoldsAndNormalize()*, *KM()* will take a single training and testing set and build the Kaplan-Meier curve for the training set using the *prodlim()* function from the *prodlim* package. The resulting Kaplan-Meier curve is the "predicted" survival distribution for all the testing patients. In addition to the survival curves, *KM()* will also return **time** and **delta** of the testing and training sets. The reason for these additional returned items is for evaluations given in Section ???. 
+Given the list of datasets generated by *createFoldsAndNormalize()*, *KM()* will take a single training and testing set and build the Kaplan-Meier curve for the training set using the *prodlim()* function from the *prodlim* package. The output (along with the output of all following models) is a list of four objects:
 
-**Example Usagw**
+1. TestCurves: The survival curves for test patients (identical for all patients for KM).
+2. TestData: The values of **time** and **delta** for the test patients (used later when evaluating survival curves).
+3. TrainData: The values of **time** and **delta** for the training patients (used later when evaluating survival curves).
+4. TrainCurves: The survival curves for the training patients.
+
+ Note the output is the same for ALL following models.
+
+**Example Usage**
 
 Here, we give an example of using KM on a single training/testing fold -- extending the results to all folds can be accomplished by using a for loop. 
 
@@ -522,10 +512,10 @@ trainAndTest = folds[[2]]
 training1stFold = trainAndTest$Training[[1]]
 testing1stFold = trainAndTest$Testing[[1]]
 kmMod = KM(training1stFold, testing1stFold)
-curves = kmMod[[1]]
-testDat = kmMod[[2]]
-trainDat = kmMod[[3]]
-curves
+testCurves = kmMod$TestCurves
+testDat = kmMod$TestData
+trainDat = kmMod$TrainData
+testCurves
 ```
 
 Above you will see that the survival curves for all patients are the exact same -- the desired effect for the Kaplan-Meier model. Note that **time** will correspond to all the event times (both death and censored event times) of the *training* data. Additionally we include a **time** = 0 point where the survival probability will be 1 -- this is consistent across all models. 
@@ -611,6 +601,7 @@ where \(\boldsymbol{w}\) are feature weights, \(\sigma\) is called a scale param
 ```{r, include=FALSE}
 library(survival)
 
+
 AFT = function(training, testing, AFTDistribution){
   tryCatch({
     AFTMod = survreg(Surv(time,delta)~., data = training, dist = AFTDistribution)
@@ -622,6 +613,7 @@ AFT = function(training, testing, AFTDistribution){
       timesToPredict = c(0,trainingTimes)
     }
     survivalCurves = survfunc(AFTMod, newdata = testing, t = timesToPredict)
+    survivalCurvesTrain = survfunc(AFTMod, newdata = training, t = timesToPredict)
   },
   error = function(e) {
     message(e)
@@ -632,15 +624,19 @@ AFT = function(training, testing, AFTDistribution){
   }
 
   probabilities = survivalCurves$sur
+  probabilitiesTrain = survivalCurvesTrain$sur
   #Since survfunc returns survival probabilities with the first time point for every individual (ordered by how the testing individuals)
   #were passed in, we can simply fill a matrix by row to have each individual curve be a column. This can be verified by checking
   #the survival probabilties (sur) for any ID_SurvivalCurves against any column, e.g. the survival probabilities for ID_SurvivalCurves == 2,
   #correspond to the probabilites found in the second column of the matrix below.
   probabilityMatrix = matrix(probabilities, ncol = nrow(testing),byrow = T)
+  probabilityTrainMatrix = matrix(probabilitiesTrain, ncol = nrow(training),byrow = T)
+  
   curvesToReturn = cbind.data.frame(time = timesToPredict, probabilityMatrix)
   timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
-  return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))   
+  trainingCurvesToReturn = cbind.data.frame(time = timesToPredict, probabilityTrainMatrix)
+  return(list(TestCurves = curvesToReturn, TestData = timesAndCensTest,TrainData = timesAndCensTrain,TrainCurves= trainingCurvesToReturn))  
 }
 
 #The following was taken and altered from http://rstudio-pubs-static.s3.amazonaws.com/161203_6ee743eb28df4cd68089a519aa705123.html.
@@ -726,7 +722,12 @@ The primary function for this file is *AFT()*; *survfun()* is a helper function 
 
 Given the list of datasets generated by *createFoldsAndNormalize()*, *AFT()* will take a single training set, testing set, and a specified distribution and learn the AFT model using the training set. Only one distribution can be tested at a time. In addition, the code contains a tryCatch command the catch the event where the AFT model fails to run, however, this only showed to occur for high dimensional datasets (when no feature selection was applied). 
 
-As with the Kaplan-Meier model, the ouput is a list of three items, (1) the survival curves of the test patients, (2) the test patients true time of death and censor status, and (3) the training patients true time of death and censor status. 
+As with the Kaplan-Meier model, the ouput is a list of four items:
+
+1. TestCurves: The survival curves for test patients (identical for all patients for KM).
+2. TestData: The values of **time** and **delta** for the test patients (used later when evaluating survival curves).
+3. TrainData: The values of **time** and **delta** for the training patients (used later when evaluating survival curves).
+4. TrainCurves: The survival curves for the training patients.
 
 **Example Usage:**
 
@@ -737,7 +738,7 @@ trainAndTest = folds[[2]]
 training1stFold = trainAndTest$Training[[1]]
 testing1stFold = trainAndTest$Testing[[1]]
 AFTMod = AFT(training1stFold, testing1stFold, "weibull")
-curves = AFTMod[[1]]
+curves = AFTMod$TestCurves
 curves
 ```
 
@@ -807,16 +808,22 @@ CoxPH_KP = function(training, testing,ElasticNet=F){
     linearPredictionsTesting = predict(coxModel,as.matrix(testing[,-c(timeInd, deltaInd)]),type = "link")
     survivalEstimate = KPEstimator(linearPredictionsTraining, training$time,training$delta)
     survCurvs = t(sapply(survivalEstimate[[2]], function(x) x^exp(linearPredictionsTesting)))
+    survCurvsTraining = t(sapply(survivalEstimate[[2]], function(x) x^exp(linearPredictionsTraining)))
+    
     survivalCurves = list(time = survivalEstimate[[1]], surv = survCurvs)
+    survivalCurvesTrain = list(time = survivalEstimate[[1]], surv = survCurvsTraining)
+    
   }
   else{
     tryCatch({
       coxModel = coxph(Surv(time,delta)~., data = training,singular.ok = T)
       survivalCurves = survfit(coxModel, testing, type = "kalbfleisch-prentice")
+      survivalCurvesTrain = survfit(coxModel, training, type = "kalbfleisch-prentice")
+      
     },
     error = function(e) {
       message(e)
-      warning("Cox-PH failed to converge (likely due to singularity). Future runs have been eliminated for Cox.")
+      warning("Cox-PH failed to converge.")
     })
     if(!exists("coxModel") | !exists("survivalCurves")){
       return(NA)
@@ -825,14 +832,20 @@ CoxPH_KP = function(training, testing,ElasticNet=F){
   if(0 %in% survivalCurves$time){
     timePoints = survivalCurves$time
     probabilities = survivalCurves$surv
+    
+    probabilitiesTrain = survivalCurvesTrain$surv
   } else{
     timePoints = c(0,survivalCurves$time)
     probabilities = rbind(1,survivalCurves$surv)
+    
+    probabilitiesTrain = rbind(1,survivalCurvesTrain$surv)
   }
   curvesToReturn = cbind.data.frame(time = timePoints, probabilities)
+  trainingCurvesToReturn = cbind.data.frame(time = timePoints, probabilitiesTrain)
   timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
-  return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))  
+  return(list(TestCurves = curvesToReturn, TestData = timesAndCensTest,TrainData = timesAndCensTrain,TrainCurves= trainingCurvesToReturn))  
+  
 }
 
 #not considering ties.
@@ -844,6 +857,7 @@ KPEstimator = function(lp,lpTime,censorStatus){
   survivalFunc = cumprod(alpha^censorStatus[orderLPTime])
   return(list(time = lpTime[orderLPTime][indexToKeep],surv = survivalFunc[indexToKeep]))
 }
+
 ```
 
 **File Purpose**: Apply the Cox Proportional-Hazards model to data that has been processed and split into folds by *createFoldsAndNormalize()*.
@@ -876,7 +890,7 @@ The primary function for this file is *CoxPH_KP()*; *KPEstimator()* is only used
 
 Given the list of datasets generated by *createFoldsAndNormalize()*, *CoxPH_KP()* will take a single training set, testing set, and a boolean specifying whether or not to use the elastic-net model. For this section we assume ElasticNet = FALSE, that is we are NOT using the elastic net formulation. The code uses a tryCatch function to avoid models which are failing to converge (this happened for high dimensional datasets). The Cox-PH model is fit using *coxph()* from the survival package and then survival curves are fit using *survfit()* and specifying the type to be the Kalbfleisch-Prentice estimator. Ties are accounted for using the default of *coxph()*, *i.e.* the Efron approximation.
 
-As with preious models, the ouput is a list of three items, (1) the survival curves of the test patients, (2) the test patients true time of death and censor status, and (3) the training patients true time of death and censor status. 
+The output is the same as the four previous models.
 
 **Example Usage:**
 
@@ -887,7 +901,7 @@ trainAndTest = folds[[2]]
 training1stFold = trainAndTest$Training[[1]]
 testing1stFold = trainAndTest$Testing[[1]]
 CoxMod = CoxPH_KP(training1stFold, testing1stFold, ElasticNet=F)
-curves = CoxMod[[1]]
+curves = CoxMod$TestCurves
 curves
 ```
 <br>
@@ -942,7 +956,7 @@ Given the list of datasets generated by *createFoldsAndNormalize()*, *CoxPH_KP()
 
 One the feature weights have been estimated, linear predictors are passed to *KPEstimator()* to estimate the survival curves. As of now, ties are not accounted for and the resulting survival distribution are using the estimate derived in the pressence of no ties. THIS NEEDS TO BE UPDATED TO EITHER USING THE BRESLOW ESTIMATOR OR NUMERICALLY GETTING ESTIMATING SURVIVAL CURVES IN THE PRESENCE OF TIES.
 
-As with preious models, the ouput is a list of three items, (1) the survival curves of the test patients, (2) the test patients true time of death and censor status, and (3) the training patients true time of death and censor status. 
+The output is the same as previous models.
 
 **Example Usage:**
 
@@ -953,7 +967,7 @@ trainAndTest = folds[[2]]
 training1stFold = trainAndTest$Training[[1]]
 testing1stFold = trainAndTest$Testing[[1]]
 CoxMod = CoxPH_KP(training1stFold, testing1stFold, ElasticNet=T)
-curves = CoxMod[[1]]
+curves = CoxMod$TestCurves
 curves
 ```
 <br>
@@ -1013,19 +1027,24 @@ library(randomForestSRC)
 RSF = function(training, testing, ntree){
   rsfMod = rfsrc(Surv(time,delta)~., data = training, ntree = ntree)
   survivalCurves = predict(rsfMod, testing)
+  survivalCurvesTrain = predict(rsfMod, training)
   trainingTimes = survivalCurves$time.interest
   if(0 %in% trainingTimes){
     times = trainingTimes
-    probabilities = t(survivalCurves$survival)
+    testProbabilities = t(survivalCurves$survival)
+    trainProbabilities = t(survivalCurvesTrain$survival)
   } else{
     times = c(0,trainingTimes)
-    probabilities = rbind.data.frame(1,t(survivalCurves$survival))
+    testProbabilities = rbind.data.frame(1,t(survivalCurves$survival))
+    trainProbabilities = rbind.data.frame(1,t(survivalCurvesTrain$survival))
   }
-  curvesToReturn = cbind.data.frame(time = times, probabilities)
+  curvesToReturn = cbind.data.frame(time = times, testProbabilities)
   timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
-  return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))  
+  trainingCurvesToReturn = cbind.data.frame(time = times, trainProbabilities)
+  return(list(TestCurves = curvesToReturn, TestData = timesAndCensTest,TrainData = timesAndCensTrain,TrainCurves= trainingCurvesToReturn))  
 }
+
 ```
 
 
@@ -1052,7 +1071,7 @@ RSF = function(training, testing, ntree){
 
 Given the list of datasets generated by *createFoldsAndNormalize()*, *RSF()* will take a single training set, testing set, and an integer specifying the number of trees to use in the forest and build the RSF model using *rfsrc()* from the randomForestSRC package. Then the *predict()* functon for rfsrc is used to build survival curves for test patients.
 
-As with previous models, the ouput is a list of three items, (1) the survival curves of the test patients, (2) the test patients true time of death and censor status, and (3) the training patients true time of death and censor status. 
+The output is the same as previous models.
 
 **Example Usage:**
 
@@ -1063,7 +1082,7 @@ trainAndTest = folds[[2]]
 training1stFold = trainAndTest$Training[[1]]
 testing1stFold = trainAndTest$Testing[[1]]
 rsfMod = RSF(training1stFold, testing1stFold, ntree = 1000)
-curves = rsfMod[[1]]
+curves = rsfMod$TestCurves
 names(curves) = c("time",1:26)
 curves
 ```
@@ -1139,7 +1158,7 @@ MTLR = function(training, testing,addLastTimePoint=F){
   system2("java", args=c('-cp ./',"ConvertDataFiles", "convert2MTLR", "training.csv", "training.mtlr", "FlipCensoredBit"))
   system2("java", args=c('-cp ./',"ConvertDataFiles", "convert2MTLR", "testing.csv", "testing.mtlr", "FlipCensoredBit"))
   system2("./mtlr_opt",args=c("-i", "training.mtlr"),stdout = FALSE)
-  system2("./mtlr_test", args=c("-i", "testing.mtlr", "-s","training.mtlr", "-o", "./fold1_modelfile > MTLR_output.txt"))
+  system2("./mtlr_test", args=c("-i", "testing.mtlr", "-s","training.mtlr","-p", "-o", "./fold1_modelfile > MTLR_output.txt"))
   times = unlist((unname(read.table("fold1_modelfile",skip = 1,sep = ",",nrows = 1))))
   if(addLastTimePoint){
     #It appears the last survival probability is always appearing to be zero. We need to add some additional time point to the end to account
@@ -1161,40 +1180,80 @@ MTLR = function(training, testing,addLastTimePoint=F){
   }
 
   testingPoints = read.table("MTLR_output.txt")
+  
+  #######Get training data
+  system2("./mtlr_test", args=c("-i", "training.mtlr", "-s","training.mtlr", "-p","-o", "./fold1_modelfile > MTLR_output.txt"))
+  timesTrain = unlist((unname(read.table("fold1_modelfile",skip = 1,sep = ",",nrows = 1))))
+  if(addLastTimePoint){
+    #It appears the last survival probability is always appearing to be zero. We need to add some additional time point to the end to account
+    #for this so we choose the value of the last time point  squared divided by the second to last time point. 
+    lastTimePoint = round(timesTrain[length(timesTrain)]^2/timesTrain[length(timesTrain) -1])
+    #Add the last time point and a 0 time point if needed.
+    if(0 %in% timesTrain){
+      timePointsTrain = c(timesTrain,lastTimePoint)
+    } else{
+      timePointsTrain = c(0,timesTrain, lastTimePoint)
+    } 
+  }
+  else{
+    if(0 %in% timesTrain){
+      timePointsTrain = timesTrain
+    } else{
+      timePointsTrain = c(0,timesTrain)
+    } 
+  }
+  trainingPoints = read.table("MTLR_output.txt")
+  #######
+  
   #Clean up directory:
-  system2("rm",args=c("fold1_modelfile","CI_log","Ptrain1", "Pmodel1", "*.csv","*.mtlr","*.txt"))
+  system2("rm",args=c("fold*_modelfile", "tmp_*","CI_log","*.csv","*.mtlr","*.txt"))
   #Replace original working directory.
   setwd(originalWd)
   #the first 4 columns are the true time of death, 1- censoring status, and 2 different averaged survival times.
   trueDeathTimes = testingPoints[,1]
   censorStatus = 1 -testingPoints[,2]
+  
+  trueDeathTimesTrain = trainingPoints[,1]
+  censorStatusTrain = 1 -trainingPoints[,2]
   #We don't want the averages (first 3 columns) and the last column is some evaluation of survival probability at the true time of death.
   #We will discard this since later on we have a method used for every survival curve. Further we minus 1 because we dont want to include the 
   #0th time point, i.e. since we use length(timePoints) we need to subtract an extra value it since we included a 0.
   #So we have ignore first 4 columns through the number of time points, subtracting 1 for the 0th time point (if we included a zero).
   if(0 %in% times){
       survivalProbabilities = testingPoints[5:(4+length(timePoints))]
+      survivalProbabilitiesTrain = trainingPoints[5:(4+length(timePointsTrain))]
+      
   } else{
       survivalProbabilities = testingPoints[5:(4+length(timePoints)-1)]
+      survivalProbabilitiesTrain = trainingPoints[5:(4+length(timePointsTrain)-1)]
     }
   #Survival probabilities were read in a factors and contain commas. We will clean this out by turning them into character vectors and 
   #trimming commas.
   survivalProbabilities = apply(survivalProbabilities,c(1,2),as.character)
   survivalProbabilities = apply(survivalProbabilities,c(1,2), function(x) as.numeric(gsub(",","",x)))
+  
+  survivalProbabilitiesTrain = apply(survivalProbabilitiesTrain,c(1,2),as.character)
+  survivalProbabilitiesTrain = apply(survivalProbabilitiesTrain,c(1,2), function(x) as.numeric(gsub(",","",x)))
   #Some of the last survival probabilities were negative so we turned these to zero. There were values like -1.2239e-17 so effectively 
   #zero anyways. Additionally we need to transpose the survival probabilities to match up with the survival time estimates and then
   #add a survival probability of 1 to the 0th time point if there was no original 0 time point.
   if(0 %in% times){
     survivalProbabilities = t(apply(survivalProbabilities, c(1,2), function(x) ifelse(x < 0,0,x)))
+    survivalProbabilitiesTrain = t(apply(survivalProbabilitiesTrain, c(1,2), function(x) ifelse(x < 0,0,x)))
+    
   } else {
     survivalProbabilities = rbind(1,t(apply(survivalProbabilities, c(1,2), function(x) ifelse(x < 0,0,x))))
+    survivalProbabilitiesTrain = rbind(1,t(apply(survivalProbabilitiesTrain, c(1,2), function(x) ifelse(x < 0,0,x))))
+    
   }
   curvesToReturn = cbind.data.frame(time = timePoints, survivalProbabilities) 
   timesAndCensTest = cbind.data.frame(time = trueDeathTimes, delta = censorStatus)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
-  return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))  
-}
+  trainingCurvesToReturn = cbind.data.frame(time = timePoints, survivalProbabilities) 
+  return(list(TestCurves = curvesToReturn, TestData = timesAndCensTest,TrainData = timesAndCensTrain,TrainCurves= trainingCurvesToReturn))  
   
+}
+
   
 ```
 
@@ -1228,7 +1287,7 @@ Given the list of datasets generated by *createFoldsAndNormalize()*, *MTLR()* wi
 
 For the source code associated with MTLR as well as a web-tool to use MTLR see the [Patient Specific Survival Prediction (PSSP) website.](http://pssp.srv.ualberta.ca)
 
-As with previous models, the ouput is a list of three items, (1) the survival curves of the test patients, (2) the test patients true time of death and censor status, and (3) the training patients true time of death and censor status. 
+The output is the same as previous models. 
 
 **Example Usage:**
 
@@ -1241,7 +1300,7 @@ training1stFold = trainAndTest$Training[[1]]
 testing1stFold = trainAndTest$Testing[[1]]
 mtlrMod = MTLR(training1stFold, testing1stFold, addLastTimePoint = FALSE)
 
-curves = mtlrMod[[1]]
+curves = mtlrMod$TestCurves
 row.names(curves) = NULL
 curves
 
@@ -2466,6 +2525,8 @@ dim(validatedAndCleaned)
 selectedData = FeatureSelection(validatedAndCleaned)
 dim(selectedData)
 ```
+
+
 
 #The Code - From Beginning To End 
 
