@@ -64,17 +64,20 @@ getBinned = function(survMod,numBins){
   uncensoredBinning = unlist(lapply(binIndex, function(x) length(which(uncensoredProbabilities >= quantiles[x] &
                                                                          uncensoredProbabilities < quantiles[x-1]))))
   censoredProbabilities = deathProbabilities[as.logical(1-censorStatus)]
-  censoredBinPositions = sindex(quantiles,censoredProbabilities, comp = "greater", strict = T)
-  #Sometimes the probability will be 1 in which case we just want to put them in the first bin. 
-  censoredBinPositions = ifelse(censoredBinPositions ==0, 1,censoredBinPositions)
-  quantileWidth = 1/numBins
-  firstBin = ifelse(censoredBinPositions == numBins,1,(censoredProbabilities - quantiles[censoredBinPositions+1])/censoredProbabilities)
-  restOfBins = ifelse(censoredProbabilities ==0,1,1/(numBins*censoredProbabilities))
+  if(length(censoredProbabilities) >0){
+    censoredBinPositions = sindex(quantiles,censoredProbabilities, comp = "greater", strict = T)
+    #Sometimes the probability will be 1 in which case we just want to put them in the first bin. 
+    censoredBinPositions = ifelse(censoredBinPositions ==0, 1,censoredBinPositions)
+    quantileWidth = 1/numBins
+    firstBin = ifelse(censoredBinPositions == numBins,1,(censoredProbabilities - quantiles[censoredBinPositions+1])/censoredProbabilities)
+    restOfBins = ifelse(censoredProbabilities ==0,1,1/(numBins*censoredProbabilities))
+    
+    listOfContributions = lapply(seq_along(censoredBinPositions),function(x) c(rep(0, censoredBinPositions[x] -1),
+                                                                               rep(firstBin[x],1),
+                                                                               rep(restOfBins[x], numBins - censoredBinPositions[x])))
+    censoredBinning = colSums(ldply(listOfContributions,rbind)) 
+  } else censoredBinning = 0
 
-  listOfContributions = lapply(seq_along(censoredBinPositions),function(x) c(rep(0, censoredBinPositions[x] -1),
-                                                                             rep(firstBin[x],1),
-                                                                             rep(restOfBins[x], numBins - censoredBinPositions[x])))
-  censoredBinning = colSums(ldply(listOfContributions,rbind))
   combinedBins = uncensoredBinning + censoredBinning
   names(combinedBins) = quantiles[-length(quantiles)]
   return(combinedBins)
