@@ -30,6 +30,7 @@ AFT = function(training, testing, AFTDistribution){
       timesToPredict = c(0,trainingTimes)
     }
     survivalCurves = survfunc(AFTMod, newdata = testing, t = timesToPredict)
+    survivalCurvesTrain = survfunc(AFTMod, newdata = training, t = timesToPredict)
   },
   error = function(e) {
     message(e)
@@ -40,15 +41,19 @@ AFT = function(training, testing, AFTDistribution){
   }
 
   probabilities = survivalCurves$sur
+  probabilitiesTrain = survivalCurvesTrain$sur
   #Since survfunc returns survival probabilities with the first time point for every individual (ordered by how the testing individuals)
   #were passed in, we can simply fill a matrix by row to have each individual curve be a column. This can be verified by checking
   #the survival probabilties (sur) for any ID_SurvivalCurves against any column, e.g. the survival probabilities for ID_SurvivalCurves == 2,
   #correspond to the probabilites found in the second column of the matrix below.
   probabilityMatrix = matrix(probabilities, ncol = nrow(testing),byrow = T)
+  probabilityTrainMatrix = matrix(probabilitiesTrain, ncol = nrow(training),byrow = T)
+  
   curvesToReturn = cbind.data.frame(time = timesToPredict, probabilityMatrix)
   timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
-  return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))   
+  trainingCurvesToReturn = cbind.data.frame(time = timesToPredict, probabilityTrainMatrix)
+  return(list(TestCurves = curvesToReturn, TestData = timesAndCensTest,TrainData = timesAndCensTrain,TrainCurves= trainingCurvesToReturn))  
 }
 
 #The following was taken and altered from http://rstudio-pubs-static.s3.amazonaws.com/161203_6ee743eb28df4cd68089a519aa705123.html.

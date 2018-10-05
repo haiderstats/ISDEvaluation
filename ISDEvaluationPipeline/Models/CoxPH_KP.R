@@ -42,12 +42,18 @@ CoxPH_KP = function(training, testing,ElasticNet=F){
     linearPredictionsTesting = predict(coxModel,as.matrix(testing[,-c(timeInd, deltaInd)]),type = "link")
     survivalEstimate = KPEstimator(linearPredictionsTraining, training$time,training$delta)
     survCurvs = t(sapply(survivalEstimate[[2]], function(x) x^exp(linearPredictionsTesting)))
+    survCurvsTraining = t(sapply(survivalEstimate[[2]], function(x) x^exp(linearPredictionsTraining)))
+    
     survivalCurves = list(time = survivalEstimate[[1]], surv = survCurvs)
+    survivalCurvesTrain = list(time = survivalEstimate[[1]], surv = survCurvsTraining)
+    
   }
   else{
     tryCatch({
       coxModel = coxph(Surv(time,delta)~., data = training,singular.ok = T)
       survivalCurves = survfit(coxModel, testing, type = "kalbfleisch-prentice")
+      survivalCurvesTrain = survfit(coxModel, training, type = "kalbfleisch-prentice")
+      
     },
     error = function(e) {
       message(e)
@@ -60,14 +66,20 @@ CoxPH_KP = function(training, testing,ElasticNet=F){
   if(0 %in% survivalCurves$time){
     timePoints = survivalCurves$time
     probabilities = survivalCurves$surv
+    
+    probabilitiesTrain = survivalCurvesTrain$surv
   } else{
     timePoints = c(0,survivalCurves$time)
     probabilities = rbind(1,survivalCurves$surv)
+    
+    probabilitiesTrain = rbind(1,survivalCurvesTrain$surv)
   }
   curvesToReturn = cbind.data.frame(time = timePoints, probabilities)
+  trainingCurvesToReturn = cbind.data.frame(time = timePoints, probabilitiesTrain)
   timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
-  return(list(curvesToReturn, timesAndCensTest,timesAndCensTrain))  
+  return(list(TestCurves = curvesToReturn, TestData = timesAndCensTest,TrainData = timesAndCensTrain,TrainCurves= trainingCurvesToReturn))  
+  
 }
 
 #not considering ties.
