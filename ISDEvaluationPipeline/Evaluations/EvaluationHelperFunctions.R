@@ -42,7 +42,7 @@ predictMeanSurvivalTimeSpline = function(survivalCurve, predictedTimes){
   slope = (1-spline(maxTime))/(0 - max(predictedTimes))
   zeroProbabilitiyTime = min( predictedTimes[which(survivalCurve ==0)], maxTime + (0-spline(maxTime))/slope)
   splineWithLinear = function(time) ifelse(time < maxTime, spline(time),1 + time*slope)
-  area = integrate(splineWithLinear,0, zeroProbabilitiyTime,subdivisions = 1000,rel.tol = .001)[[1]]
+  area = integrate(splineWithLinear,0, zeroProbabilitiyTime,subdivisions = 1000,rel.tol = .0001)[[1]]
   return(area)
 }
 
