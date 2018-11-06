@@ -16,13 +16,14 @@
 
 ## Function 1: OneCalibration(survMod, timeOfInterest = c(), type = "DN", numBuckets = 10)
 
-# Input 1: A list of 4 items:(1) TestCurves - The survival curves for the testing set.
+#Inputs:
+#   survMod: A list of 4 items:(1) TestCurves - The survival curves for the testing set.
 #                            (2) TestData - The censor/death indicator and event time for the testing set. 
 #                            (3) TrainData - The censor/death indicator and event time for the training set. 
 #                            (4) TrainCurves - The survival curves for the training set.
-# Input 2: The time(s) of interest to evaluate 1-Calibration.
-# Input 3: A string indicating the type of 1-Calibration. Either "Uncensored" or "DN".
-# Input 4: The number of Buckets/Bins/Groups to use for 1-Calibration.
+#   timeOfInteres: The time(s) of interest to evaluate 1-Calibration.
+#   type: A string indicating the type of 1-Calibration. Either "Uncensored" or "DN".
+#   numBuckets: The number of Buckets/Bins/Groups to use for 1-Calibration.
 
 # Output: The p-value(s) for 1-Calibration.
 
@@ -31,8 +32,9 @@
 
 ## Function 2: OneCalibrationCumulative(listOfSurvivalModels, timeOfInterest = c(), type = "DN", numBuckets = 10)
 
-# Input 1: A list of models, each corresponding to survMod in OneCalibration()
-# Other Inputs: See OneCalibration()
+# Inputs:
+#   listOfSurvivalModels: A list of models, each corresponding to survMod in OneCalibration()
+#   Other Inputs: See OneCalibration()
 
 # Output: The p-value(s) for 1-Calibration.
 
@@ -41,10 +43,11 @@
 
 ## Function 3: binItUp(trueDeathTimes,censorStatus, predictions, type, numBuckets,timeOfInterest)
 
-# Input 1: A vector of true event times for each patient.
-# Input 2: A vector indicating if a patient was uncensored or censored.
-# Input 3: A vector of survival probabilties at the time of interest.
-# Other Inputs: See OneCalibration()
+# Inputs:
+#   trueDeathTimes: A vector of true event times for each patient.
+#   censorStatus: A vector indicating if a patient was uncensored or censored.
+#   predictions: A vector of survival probabilties at the time of interest.
+#   Other Inputs: See OneCalibration()
 
 # Output: The p-value(s) for 1-Calibration.
 
