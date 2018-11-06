@@ -5,6 +5,8 @@
 #Email: hshaider@ualberta.ca
 
 ### General Comments ######################################################################################################################
+#The algorithim here is based Multi-task Logistic Regression (MTLR) for which the original paper can be found here:
+#https://papers.nips.cc/paper/4210-learning-patient-specific-cancer-survival-distributions-as-a-sequence-of-dependent-regressors
 
 #This file is used to run MTLR to generate individual survival curves. Here we are using R's base `optim` function for gradient descent
 #(L-BFGS-B) specifically. In order to optimize the code we have written the gradient and objective function calculation in Rcpp files
