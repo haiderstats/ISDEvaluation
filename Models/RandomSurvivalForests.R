@@ -90,7 +90,6 @@ internalCV_RSF = function(training, numFolds){
     resultsMatrix[i,] = resultVec
   }
   meanResults = apply(resultsMatrix, 2, mean)
-  print(meanResults)
   bestRes = which.min(meanResults)
   bestNtree = c(500,1000,2000)[ceiling(bestRes/3)]
   bestSize = c(1,2,3)[ifelse(bestRes%%3 ==0, 3,bestRes%%3)]
