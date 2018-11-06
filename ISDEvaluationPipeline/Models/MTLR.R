@@ -15,7 +15,7 @@ library(Rcpp)
 sourceCpp("Models/AdditionalMTLRFiles/C/MTLRRCpp.cpp")
 source("ValidateCleanCV/createFoldsAndNormalize.R")
 
-MTLR2 = function(training, testing, C1 = NULL, numFolds = 5){
+MTLR = function(training, testing, C1 = NULL, numFolds = 5){
   if(is.null(C1)){
     C1 = internalCV(training, numFolds)
   }
