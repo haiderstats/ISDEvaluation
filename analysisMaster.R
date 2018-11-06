@@ -169,18 +169,18 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       mtlrTimes = c(mtlrTimes,mtlrMod[[1]]$time)
     }
     #Evaluations - Note that if evaluations are passed a NULL value they return a NULL.
-    DCalResults = NULL;OneCalResults = NULL;ConcCensResults = NULL;ConcUncensResults = NULL;
+    DCalResults = NULL;OneCalResults = NULL;ConcordanceResults = NULL;
     BrierResultsInt = NULL;BrierResultsSingle = NULL;L1Results = NULL; L2Results = NULL; 
     if(Concor){
       print("Staring Evaluation: Concordance")
-      coxConcUncens = Concordance(coxMod, concordanceTies,survivalPredictionMethod)
-      coxENConcUncens = Concordance(coxENMod, concordanceTies,survivalPredictionMethod)
-      kmConcUncens = Concordance(kmMod, concordanceTies,survivalPredictionMethod)
-      rsfConcUncens = Concordance(rsfMod, concordanceTies,survivalPredictionMethod)
-      aftConcUncens = Concordance(aftMod, concordanceTies,survivalPredictionMethod)
-      mtlrConcUncens = Concordance(mtlrMod, concordanceTies,survivalPredictionMethod)
+      coxConc = Concordance(coxMod, concordanceTies,survivalPredictionMethod)
+      coxENConc = Concordance(coxENMod, concordanceTies,survivalPredictionMethod)
+      kmConc = Concordance(kmMod, concordanceTies,survivalPredictionMethod)
+      rsfConc = Concordance(rsfMod, concordanceTies,survivalPredictionMethod)
+      aftConc = Concordance(aftMod, concordanceTies,survivalPredictionMethod)
+      mtlrConc = Concordance(mtlrMod, concordanceTies,survivalPredictionMethod)
       
-      ConcUncensResults = rbind(coxConcUncens,coxENConcUncens, kmConcUncens, rsfConcUncens, aftConcUncens, mtlrConcUncens)
+      ConcordanceResults = rbind(coxConc,coxENConc, kmConc, rsfConc, aftConc, mtlrConc)
     }
     if(BrierInt){
       print("Staring Evaluation: Brier Score- Integrated")
@@ -217,10 +217,10 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       
       L1Results = rbind(coxL1,coxENL1,kmL1,rsfL1,aftL1,mtlrL1)
     }
-    toAdd = as.data.frame(cbind(ConcUncensResults,
+    toAdd = as.data.frame(cbind(ConcordanceResults,
                                 BrierResultsInt, BrierResultsSingle,L1Results))
     metricsRan = c(Concor,BrierInt,BrierSingle, L1Measure)
-    names(toAdd) = c("ConcordanceUncensensored",
+    names(toAdd) = c("Concordance",
                      "BrierResultsInt","BrierResultsSingle", "L1Results")[metricsRan]
     modelsRan = c(CoxKP,CoxKPEN, KaplanMeier, RSFModel, AFTModel, MTLRModel)
     models = c("CoxKP","CoxKPEN","Kaplan-Meier","RSF","AFT", "MTLR")[modelsRan]
