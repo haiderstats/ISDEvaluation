@@ -1,25 +1,50 @@
+#### File Information #####################################################################################################################
 #File Name: AcceleratedFailureTime.R
 #Date Created: May 28, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
 
-#Purpose and General Comments:
-#This file is used to run the Accelerated Failure Time (AFT) model for some specified distribution. The most common distributions for
-#AFT are the Weibull, Log-logistic, and Log-Normal distributions. This implimentaiton only supports the following distributions:
-#weibull, exponential, lognormal, gaussian, loglogistic, and logistic.
-#Here we will take in a training and a testing set. The function will then train on the training set and return a list containing (1) a 
-#matrix of survival curves, where the first column is time values and all following columns are survival probabilities of test subjects and 
-#(2) the true death times and event indicator (i.e. time and delta) of the test subjects.
+### General Comments ######################################################################################################################
 
-#Input #1: Survival Dataset post normalization and imputation.
-#Input #2: The distribution for AFT to use.
-#Output: A list of (1) matrix of survival curves, and (2) the true death times.
-############################################################################################################################################
-#Library Dependencies
+#This file is used to run the Accelerated Failure Time (AFT) model for some specified distribution to create individual survival curves.
+#This implimentaiton only supports the following distributions: weibull, exponential, lognormal, gaussian, loglogistic, and logistic.
+
+### Functions #############################################################################################################################
+
+## Function 1: AFT(training, testing, AFTDistribution)
+
+#Inputs:
+#   training: The training dataset (after normalization and imputation).
+#   testing: The testing dataset (after normalization and imputation).
+#   AFTDistribution: The distribution to use for the AFT model.
+
+# Output: A list of 4 items:(1) TestCurves - The survival curves for the testing set.
+#                           (2) TestData - The censor/death indicator and event time for the testing set. 
+#                           (3) TrainData - The censor/death indicator and event time for the training set. 
+#                           (4) TrainCurves - The survival curves for the training set.
+
+# Usage: Train and evaluate the AFT model.
+
+
+## Function 2:  survfunc(AFTMod, newdata, t)
+
+# Inputs:
+#   AFTMod: The AFT model returned by survreg().
+#   newdata: The data on which to evaluate the AFT model.
+#   t: The times at which to evaluate the AFT model.
+
+# Output: The survival curves for each patient.
+
+# Usage: Evaluate the AFT model to get survival probabilites. (Helper function for AFT).
+
+
+### Code #############################################################################################################################
+#Library Dependencies:
 #survival is needed to get survreg for the AFT model.
 library(survival)
 
 AFT = function(training, testing, AFTDistribution){
+  #Sometimes the AFT model will fail to converge (though rare) we want to catch this.
   tryCatch({
     AFTMod = survreg(Surv(time,delta)~., data = training, dist = AFTDistribution)
     

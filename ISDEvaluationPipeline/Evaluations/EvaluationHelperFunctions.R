@@ -1,16 +1,53 @@
+#### File Information #####################################################################################################################
+
 #File Name: EvaluationHelperFunctions.R
 #Date Created: May 28th, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
 
-#Purpose and General Comments:
-#This file should be sourced into the different evaluation methods, it contains functions which may be useful for multiple evaluation methods.
-##############################################################################################################################################
-#Library Dependencies: None.
+### General Comments ######################################################################################################################
+#This file contains a number of methods useful for model predictions/model evaluations.
 
+### Functions #############################################################################################################################
+
+## Function 1: predictProbabilityFromCurve(survivalCurve,predictedTimes, timeToPredict)
+
+# Inputs:
+#   survivalCurve: A vector of survival probabilities, e.g. (1, .9, .8, 0)
+#   predictedTimes: The times corresponding to each survival probability, e.g. (0, 10, 20, 40)
+#   timeToPredict: The time at which to evaluate the survival curve
+
+# Output: The probability of a survival curve given a specified time.
+
+# Usage: Given a survival curve we would like to extract a survival probability for a certain time. To do this we need to fit the model
+#        to a spline an then extrac the survival probability.
+
+
+## Function 2: predictMeanSurvivalTimeSpline(survivalCurve,predictedTimes)
+
+# Inputs: See predictProbabilityFromCurve()
+
+# Output: The mean survival time given a survival curve.
+
+# Usage: Given a survival curve we extend the curve to zero using a linear line and then integrate to get the mean survival time.
+
+
+## Function 3: predictMeanSurvivalTimeSpline(survivalCurve,predictedTimes)
+
+# Inputs: See predictProbabilityFromCurve()
+
+# Output: The median survival time given a survival curve.
+
+# Usage: Given a survival curve we extend the curve to zero using a linear line and then get the median time. (Note the linear extension
+#        does not need to go all the way to zero.)
+
+
+### Code ##################################################################################################################################
+#Library Dependencies: None.
 #We need some type of predict function for survival curves - here we build a spline to fit the survival model curve. This spline is 
-#the montotone spline using the hyman filtering of the cubic Hermite spline method, see https://en.wikipedia.org/wiki/Monotone_cubic_interpolation. Also see 
-#help(splinefun), specifically for method = "monoH.FC". Note that we make an alteration to the method because if the last two time points
+#the montotone spline using the hyman filtering of the cubic Hermite spline method,
+#see https://en.wikipedia.org/wiki/Monotone_cubic_interpolation. Also see help(splinefun).
+#Note that we make an alteration to the method because if the last two time points
 #have the same probability (y value) then the spline is constant outside of the training data. We need this to be a decreasing function
 #outside the training data so instead we take the linear fit of (0,1) and the last time point we have (p,t*) and then apply this linear
 #function to all points outside of our fit.

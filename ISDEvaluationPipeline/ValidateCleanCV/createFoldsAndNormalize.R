@@ -1,40 +1,82 @@
+#### File Information #####################################################################################################################
 #File Name: createFoldsAndNormalize.R
 #Date Created: May 25, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
 
-#Purpose and General Comments:
+### General Comments ######################################################################################################################
 #The purpose of this file is to take in a dataset which has already been validated and had some (initial) cleaning. Here we expand upon
 #that by creating cross validation folds and doing basic mean imputation and normalizing the data. Specifically, we will do a one hot 
 #encoding for factor variables and subtract the mean and divide by the standard deviation for numeric variables. We make sure not to do
 #this for the 'time' and 'delta' variables.
 
-#Input #1: Survival Dataset which has been validated and had initial cleaning
-#Input #2: Desired number of folds.
-#
-#Output: List containing two lists, a training list and a testing list. Each of these inner lists will contain K datasets where K is the
-#number of desired folds.
-#Diagram of Output:
+
+### Functions #############################################################################################################################
+
+## Function 1: createFoldsAndNormalize(survivalDataset, numberOfFolds)
+
+# Inputs:
+#   survivalDataset: A survival dataset which has been validated and cleaned by validateAndClean().
+#   numberOfFolds:   The number of folds to split the data into (must be greater than 1).
+
+# Output: A list of 2 items. The first being the original indexing of the data so that test data is placed back in order at the end.
+# The second item is a list containing two lists, a training list and a testing list. Each of these inner lists will contain K datasets
+# where K is the number of desired folds.
+# Diagram of Output (2nd item):
 #                             
 #                                  |.--> Training Dataset #1
 #                                  |.--> Training Dataset #2
 #              |---> Training List |
 #              |                   |.--> Training Dataset #(K-1)
 #              |                   |.--> Training Dataset #K
-#Starting List |
+# Starting List|
 #              |                   |.--> Testing Dataset #1
 #              |                   |.--> Testing Dataset #2
 #              |--->  Testing List |
 #                                  |.--> Testing Dataset #(K-1)
 #                                  |.--> Testing Dataset #K
-############################################################################################################################################
-#Library dependencies:
+
+# Usage: Use this function to create folds of data and normalize the features. Then pass those folds to survival models.
+
+
+## Function 2: createFoldsOfData(survivalDataset, numberOfFolds)
+
+# Inputs: See createFoldsAndNormalize().
+
+# Output: A list containing (1) the fold indicies and (2) a list containing the training/testing folds. See above diagram.
+
+# Usage: Helper function for createFoldsAndNormalize. 
+#        This function splits the data into folds. (Helper function of createFoldsAndNormalize).
+
+
+## Function 3: meanImputation(listOfDatasets)
+
+# Inputs:
+#   listOfDatasets: The second output of createFoldOfData (see diagram).
+
+# Output: The same list of datasets passed in but with missing values imputed to the mean of each feature.
+
+# Usage: Helper function for createFoldsAndNormalize. 
+# This function imputes all the missing values.
+
+
+## Function 4: normalizeVariables(listOfImputedDatasets)
+
+# Inputs:
+#   listOfImputedDatasetsThe output of meanImputation.
+
+# Output: The same list of datasets passed in but with features normalized.
+
+# Usage: Helper function for createFoldsAndNormalize. 
+# This function normalizes all the features.
+
+### Code ##################################################################################################################################
+#Library Dependencies:
 #We use the one hot encoding function built into caret (dummyVars).
 library(caret)
 #We use this for the build_scales function to apply normalization to variables.
 library(dataPreparation)
 
-#Functions:
 createFoldsAndNormalize = function(survivalDataset, numberOfFolds){
   folds = createFoldsOfData(survivalDataset, numberOfFolds)
   originalIndexing = folds[[1]]

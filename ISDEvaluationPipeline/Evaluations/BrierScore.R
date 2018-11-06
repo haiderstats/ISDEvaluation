@@ -1,32 +1,70 @@
+#### File Information #####################################################################################################################
 #File Name: BrierScore.R
 #Date Created: May 28th, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
 
-#Purpose and General Comments:
+### General Comments ######################################################################################################################
 #This file was created to implement a single time and integrated time Brier score. The integrated Brier Score is evaluted numerically 
-#two different ways. One option is to use the time points at the event times in the testing data. This option would correspond to 
-#basedOnEvents =T. In this case, the function integratedBrier() is used. In this event, numerical integration is doen using the trapezoid rule(
-#see: https://en.wikipedia.org/wiki/Trapezoidal_rule). This is what is does when calling the sbrier function. 
-#The other option is to simply use the built in integrate() function which is an implementation of a numerical integration technique. 
-#This evaluates enough points in the interval to produce a numerical integral with low error. 
-#This function uses the singleBrierMultiplePoints() function. If only one point is evaluated the singleBrier() function is used.
-#Ideally, singleBrier and singleBrierMultiplePoints would be built into one function but this has not been done yet. 
+#two different ways. Either one can specifcy the number of points to evaluate the brier score and a uniform selection of these points will
+#be chosen from 0 to the max event time. If numPoints is left to be null then the event times in the dataset will be evaluated.
 
-#survMod: A list of (1) a matrix of survival curves, and (2) the true death times and event/censoring indicator (delta =1 implies death/event)
-#of the TESTING data, and (3) the true death times and event/censoring indicator (delta =1 implies death/event) of the TRAINING data.
+### Functions #############################################################################################################################
 
-#type: A string indicating whether the Brier score will be "Single" or "Integrated"
 
-#singleBrierTime: The time for the Single Brier score to be evaluated, a single numeric value, e.g. 42.
+## Function 1: BrierScore(survMod, type = "Integrated", singleBrierTime = NULL, integratedBrierTimes = NULL, numPoints=NULL)
 
-#integratedBrierTimes: A vector of length two giving the limits of integration for the integrated Brier Score.
+#Inputs:
+#   survMod: A list of 4 items:(1) TestCurves - The survival curves for the testing set.
+#                            (2) TestData - The censor/death indicator and event time for the testing set. 
+#                            (3) TrainData - The censor/death indicator and event time for the training set. 
+#                            (4) TrainCurves - The survival curves for the training set.
+#   type: The type of Brier score to compute. Either "Single" or "Integrated"
+#   singleBrierTime: If "Single" is selected, indicate the time at which to evaluate the Brier Score. If left as NULL,
+#                    the median event time is used.
+#   integratedBrierTimes: A vector of length 2 indicating the interval to use for the Brier score (e.g. c(0,100)) would be evaluating
+#                         from t= 0 to t = 100. If left NULL then the interval is t = 0 to the maximum event time (using both the
+#                         training and testing sets).
+#   numPoints: The number of points to use for the integrated Brier score. If left NULL then the points will correspond to the event times 
+#               in the testing dataset.
 
-#numPoints: The number of points to numerically evaluate the Brier score -- the larger the number of points, the more accurate the integral.
+# Output: The desired Brier score.
 
-#Output: The desired type of Brier Score (single or integrated).
-###############################################################################################################################################
-#Library dependencies:
+# Usage: Evaluate the Brier score on a given survival model, e.g. MTLR, CoxENKP, RSF.
+
+
+## Function 2: singleBrier(survMod,singleBrierTime)
+
+# Inputs: See BrierScore().
+
+# Output: The Brier score at the indicated time.
+
+# Usage: Evaluate the SINGLE TIME Brier score on a given survival model at a given time. (Helper Function for BrierScore).
+
+
+## Function 3: integratedBrier(survMod,integratedBrierTimes,numPoints)
+
+# Inputs: See BrierScore().
+
+# Output: The Integrated Brier Score for the given interval.
+
+# Usage: Evaluate the Integrated Brier score on a given survival model at a given time. (Helper Function for BrierScore).
+
+
+## Function 4: singleBrierMultiplePoints(survMod,BrierTimes)
+
+# Inputs:
+#   survMod: See BrierScore().
+#   BrierTimes: A vector of time to evaluate the Brier Score.
+
+# Output: The single time Brier score evaluated at all BrierTimes.
+
+# Usage: Evaluate the Single Brier score for an entire vector of times (does not work for a single time).
+#        (Helper Function for integratedBrier).
+
+
+### Code #############################################################################################################################
+#Library Dependencies:
 #prodlim gives a faster KM implementation and also gives a predict function for KM
 library(prodlim)
 #Helper functions:

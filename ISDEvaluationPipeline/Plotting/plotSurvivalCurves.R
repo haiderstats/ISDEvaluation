@@ -1,12 +1,32 @@
+#### File Information #####################################################################################################################
 #File Name: plotSurvivalCurves.R
 #Date Created: June 20, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
 
-#Purpose and General Comments:
-############################################################################################################################################
-#Dependencies
+### General Comments ######################################################################################################################
+#This file is used to plot the survival curves of each survival model.
+
+### Functions #############################################################################################################################
+
+## Function 1: plotSurvivalCurves(survivalCurves, indexToPlot = 1, color = c(), xlim = c())
+
+#Inputs: 
+#   survivalCurves: A matrix of survival curves. The first column must be the survival times and all other columns should represent the 
+#                   survival probabilites at each of those times.
+#   indexToPlot: The indexs to plot i.e. which patients curve to plot.
+#   color: The survival curve color. This must match the length of then number of indexs to plot.
+#   xlim: The interval to plot on the x-axis.
+
+# Output: The plot of the survival curves.
+
+# Usage: This function should be used to plot survival curves.
+
+### Code ##################################################################################################################################
+#Library Dependencies:
+#For the plots:
 library(ggplot2)
+#For shaping the data into long form:
 library(reshape2)
 plotSurvivalCurves = function(survivalCurves, indexToPlot = 1, color = c(), xlim = c()){
   colorOK = T

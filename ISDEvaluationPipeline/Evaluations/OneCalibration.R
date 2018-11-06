@@ -1,25 +1,61 @@
+#### File Information #####################################################################################################################
 #File Name: OneCalibration.R
 #Date Created: May 29th, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
 
-#Purpose and General Comments:
-#This file was created to implement one calibration as an evaluation metric for individual survival curves. There are three different
-#implementations of one calibration: Uncensored, Fractional, and BucketKM.
+### General Comments ######################################################################################################################
+#This file was created to implement one calibration as an evaluation metric for individual survival curves. There are two different
+#implementations of one calibration: Uncensored, and DN.
 #Uncensored: This method places all indiviuals into decile buckets and then removes all censored individuals.
 #DN: This method is known as the D'Agostino-Nam method and builds a KM curve within each bucket and uses the KM estimate of t* as the
 #value for the observed number of events. For numBuckets <= 15 this follows a chi.square statistic with Numbucket-1 degrees of freedom, 
 #For numBuckets > 15 it follows chi-squared with numBuckets -2 degrees of freedom.
-#Input 1: A list of (1) a matrix of survival curves, and (2) the true death times and event/censoring indicator (delta =1 implies death/event).
-#Output: The desired L-measure value.
-##############################################################################################################################################
-#Library Dependencies
+
+### Functions #############################################################################################################################
+
+## Function 1: OneCalibration(survMod, timeOfInterest = c(), type = "DN", numBuckets = 10)
+
+# Input 1: A list of 4 items:(1) TestCurves - The survival curves for the testing set.
+#                            (2) TestData - The censor/death indicator and event time for the testing set. 
+#                            (3) TrainData - The censor/death indicator and event time for the training set. 
+#                            (4) TrainCurves - The survival curves for the training set.
+# Input 2: The time(s) of interest to evaluate 1-Calibration.
+# Input 3: A string indicating the type of 1-Calibration. Either "Uncensored" or "DN".
+# Input 4: The number of Buckets/Bins/Groups to use for 1-Calibration.
+
+# Output: The p-value(s) for 1-Calibration.
+
+# Usage: Calculate 1-Calibration on a test set given a survival model.
+
+
+## Function 2: OneCalibrationCumulative(listOfSurvivalModels, timeOfInterest = c(), type = "DN", numBuckets = 10)
+
+# Input 1: A list of models, each corresponding to survMod in OneCalibration()
+# Other Inputs: See OneCalibration()
+
+# Output: The p-value(s) for 1-Calibration.
+
+# Usage: Calculate 1-Calibration on the entire dataset using all folds of data.
+
+
+## Function 3: binItUp(trueDeathTimes,censorStatus, predictions, type, numBuckets,timeOfInterest)
+
+# Input 1: A vector of true event times for each patient.
+# Input 2: A vector indicating if a patient was uncensored or censored.
+# Input 3: A vector of survival probabilties at the time of interest.
+# Other Inputs: See OneCalibration()
+
+# Output: The p-value(s) for 1-Calibration.
+
+# Usage: Take in survival models and return the p-value. (Helper function for OneCalibration/OneCalibrationCumulative).
+
+### Code ##################################################################################################################################
+#Library Dependencies:
 #We use this for the Surv function.
 library(survival)
-
 #We use this for group_by, summarise, and mutate.
 library(dplyr)
-
 #Helper Functions: predictProbabilityFromCurve(survivalCurve,predictedTimes, timeToPredict)
 source("Evaluations/EvaluationHelperFunctions.R")
 
@@ -78,7 +114,6 @@ OneCalibrationCumulative = function(listOfSurvivalModels, timeOfInterest = c(), 
   }
   return(pval)
 }
-
 
 binItUp = function(trueDeathTimes,censorStatus, predictions, type, numBuckets,timeOfInterest){
   #We need to divide the number of predictions into as equal size buckets as possible. The formula for this can be found here:

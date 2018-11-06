@@ -1,13 +1,39 @@
-#File Name: DCalibration.R
+#### File Information #####################################################################################################################
+#File Name: FeatureSelection.R
 #Date Created: June 21st, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
 
-#Purpose and General Comments:
-#This file allows for feature selection in the pre processing steps for ISD evaluations.
-#Output: The dataset with selected features.
-##############################################################################################################################################
-#Library Dependencies
+### General Comments ######################################################################################################################
+#This file allows for feature selection in the pre processing steps for ISD evaluations. Future feature selection methods should be written
+#and added to the switch statement.
+
+### Functions #############################################################################################################################
+
+## Function 1: FeatureSelection(dataset, type ="UniCox", obs_thresh = 0, pThresh = 0.1)
+
+# Inputs:
+#   dataset:    The survival dataset post validation.
+#   type:       The type of feature selection. Currently only "UniCox" is supported.
+#   obs_thresh: The number of observations that must be included in that feature (e.g. for categorical featrures) to be considered.
+#   pThresh:    The p-value threshold required to keep the feature (univariate cox model p-value must be lower than threshold).
+
+# Output: The reduced survival dataset (also oneHot encoded).
+
+# Usage: Use this function to perform feature selection on the dataset.
+
+
+## Function 2: uniCox(dataset, obs_thresh, pThresh)
+
+# Inputs: See FeatureSelection().
+
+# Output: The reduced survival dataset.
+
+# Usage: This performs univariate cox feature selection.
+
+### Code ##################################################################################################################################
+#Library Dependencies:
+#We use caret for the dummyVars function.
 library(caret)
 FeatureSelection = function(dataset, type ="UniCox", obs_thresh = 0, pThresh = 0.1){
   selectedData = switch(type,
@@ -24,8 +50,8 @@ FeatureSelection = function(dataset, type ="UniCox", obs_thresh = 0, pThresh = 0
 #Humza then made some modifications from the original and this modified version is given below.
 #Here we are simply seeing if variables are significant in a univariate cox model. If the p-value is below a specified value (default is 0.1),
 #Then it is returned in the dataset, otherwise it is removed.
-uniCox <- function(dataset, obs_thresh=0, pThresh = 0.1){
-  # select variables with p-val < 0.1 via univariate Cox
+uniCox <- function(dataset, obs_thresh, pThresh){
+  # select variables with p-val <pThresh via univariate Cox
 
   # determine the threshold for whether or not a variable is acceptable (each allowed value should correspond to a
   #minimum number of observations)

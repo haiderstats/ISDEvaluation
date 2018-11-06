@@ -1,26 +1,53 @@
+#### File Information #####################################################################################################################
 #File Name: DCalibration.R
 #Date Created: May 28th, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
 
-#Purpose and General Comments:
+### General Comments ######################################################################################################################
 #This file was created to implement D-Calibration as an evaluation measure for individual survival curves.
 #Currently there are two options, DCalibration and DCalibrationCumulative. Since we are doing Cross validation it doesn't make much sense
 #to be averaging p-values. For this reason we have DCalibrationCumulative which takes in a list of lists containing survival curves, one entry
 #for each fold of the cross validation. 
-#DCalibration:
-#Input 1: A list of (1) a matrix of survival curves, and (2) the true death times and event/censoring indicator (delta =1 implies death/event)
-#for the TESTING Data, and (3) the true death times and event/censoring indicator (delta =1 implies death/event) for the TRAINING Data.
-#Input 2: The number of bins to evaluate D-calibration.
-#Output: The p-value associated with D-calibration.
-#DCalibrationCumulative:
-#Input 1: A list (size = number of folds) of lists each contraining (1) a matrix of survival curves, and (2) the true death 
-#times and event/censoring indicator (delta =1 implies death/event) for the TESTING Data, and (3) the true death times and event/censoring 
-#indicator (delta =1 implies death/event) for the TRAINING Data.
-#Input 2: The number of bins to evaluate D-calibration.
-#Output: The p-value associated with D-calibration across ALL survival curves.
-##############################################################################################################################################
-#Library Dependencies
+
+### Functions #############################################################################################################################
+
+## Function 1: DCalibration(survMod, numBins = 10)
+
+#Inputs:
+#   survMod: A list of 4 items:(1) TestCurves - The survival curves for the testing set.
+#                              (2) TestData - The censor/death indicator and event time for the testing set. 
+#                              (3) TrainData - The censor/death indicator and event time for the training set. 
+#                              (4) TrainCurves - The survival curves for the training set.
+#   numBins: The number of Buckets/Bins/Groups to use for D-Calibration.
+
+# Output: The p-value for D-Calibration (for a given test set).
+
+# Usage: Calculate D-Calibration on a test set given a survival model.
+
+
+## Function 2: DCalibrationCumulative(listOfSurvivalModels, numBins = 10)
+
+# Inputs:
+#   listOfSurvivalModels: A list of models, each corresponding to survMod in DCalibration()
+#   numBins:  The number of Buckets/Bins/Groups to use for D-Calibration.
+
+# Output: The p-value for D-Calibration (across an entire dataset).
+
+# Usage: Calculate D-Calibration on the entire dataset using all folds of data.
+
+
+## Function 3: getBinned(survMod, numBins)
+
+# Inputs: See DCalibration()
+
+# Output: The counts for each bin.
+
+# Usage: Given a survival model get death counts for each bin corresponding to the bins percentiles. (Helper function for DCalibration/
+#        DCalibrationCumulative).
+
+### Code ##################################################################################################################################
+#Library Dependencies:
 #We use this for the sindex function.
 library(prodlim)
 #We use this for ldply, a combiner of lists.
@@ -28,7 +55,7 @@ library(plyr)
 #Helper Functions: predictProbabilityFromCurve(survivalCurve,predictedTimes, timeToPredict)
 source("Evaluations/EvaluationHelperFunctions.R")
 
-DCalibration = function(survMod, numBins){
+DCalibration = function(survMod, numBins = 10){
   #Being passed an empty model.
   if(is.null(survMod)) return(NULL)
   #Being passed a model that failed.
@@ -38,7 +65,7 @@ DCalibration = function(survMod, numBins){
   return(pvalue)
 }
 
-DCalibrationCumulative = function(listOfSurvivalModels, numBins){
+DCalibrationCumulative = function(listOfSurvivalModels, numBins = 10){
   if(length(listOfSurvivalModels) == 0) return(NULL)
   suppressWarnings(if(any(unlist(lapply(listOfSurvivalModels, is.na)))) return(NA))
   #Here we apply getBinned to every survival model, stack the bins into a matrix, and sum the columns to get the total bin values.
@@ -46,7 +73,6 @@ DCalibrationCumulative = function(listOfSurvivalModels, numBins){
   pvalue = chisq.test(combinedBins)$p.value
   return(pvalue)
 }
-
 
 getBinned = function(survMod,numBins){
   predictedTimes = survMod[[1]][,1]

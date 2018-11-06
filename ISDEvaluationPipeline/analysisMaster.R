@@ -1,41 +1,50 @@
+#### File Information #####################################################################################################################
 #File Name: analysisMaster.R
 #Date Created: May 26, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
 
-#Purpose and General Comments:
+### General Comments ######################################################################################################################
 #This file can act as a master file to analyze a given dataset with all modeling techniques and evaluation metrics.
 
-#Funtion 1: analysisMaster()
+### Functions #############################################################################################################################
 
-#Input: 
-#survivalDataset - This is the dataset one wishes to analyze. This must include 'time', 'delta', and at least 1 more feature. No default.
-#numberOfFolds - The number of desired cross-validation folds. No default.
-#CoxKP, CoxKPEN, KaplanMeier, RSFModel, AFTModel, MTLRModel: Booleans specifying whether or not to run that model. Default is TRUE.
-#DCal, OneCal, Concor, L1Measure, BrierSingle, BrierInt: Booleans specifying whether or not to run that evaluation metric. Default is TRUE.
-#DCalBins: Number of bins for D-Calibration. Default is 10.
-#OneCalTime: An int specifying the time to evaluate 1-Calibration.
-#If left as NULL but OneCal = TRUE, then the 10th, 25th, 50th, 75th, and 90th percentiless of all event times are used. Default is NULL.
-#concordanceTies: A string ("None", "Time", "Risk","All") indicating how to handle ties in concordance. Default is "Risk".
-#SingleBrierTime: The time to evaluate the Brier Score. If left as null, the 50th percentile of all event times is used. Default is NULL.
-#IntegratedBrierTimes: A 2 length vector (e.g. c(0,100)) specifying the lower and upper bounds on the integrated Brier score. If NULL then
-#the default is 0 as a lower bound and the max event time of the entire dataset is used as an upper bound. Default is NULL.
-#numBrierPoints: The number of points to evaluate the integrated Brier score. A simple trapezoidal numerical approximation is used. Default
-#is 1000 points.
-#Ltype: The type of L1-loss. Must be one of "Uncensored","Hinge", or "Margin". Default is "Margin".
-#Llog: A boolean specifying whether or not to use log-L1 metric. Default is FALSE.
-#typeOneCal: A string indicating the type of 1-Calibrtion to use. Must be one of "DN" or "Uncensored". Default is "DN".
-#oneCalBuckets: An int specifying number of bins for 1-Calibration. Default is 10.
-#survivalPredictionMethod: The way in which to estimate average surival times. Must be one of "Mean" or "Median". Default is "Mean".
-#AFTDistribution: The distribution to use for AFT, default is "weibull". Must be one of "weibull","exponential","lognormal","gaussian",
-#"loglogistic","logistic".
-#ntree: The number of trees for RSF. Default is 1000.
-#FS: A boolean specifying whether or not to use feature selection. Default is TRUE.
-#imputeZero: A boolean specifying whether 0 valued times should be imputed (AFT breaks for 0 valued times). If TRUE then 0 valued times are
-#imputed to half the minimum non-zero time. Default is TRUE.
+## Function 1: analysisMaster = function(survivalDataset, numberOfFolds,
+#                                        CoxKP = T,CoxKPEN = T, KaplanMeier = T, RSFModel = T, AFTModel = T, MTLRModel =T, #Models
+#                                        DCal = T, OneCal = T, Concor = T, L1Measure = T, BrierInt = T, BrierSingle = T, #Evaluations
+#                                        DCalBins = 10, OneCalTime = NULL,  concordanceTies = "Risk", #Evaluation args
+#                                        SingleBrierTime = NULL, IntegratedBrierTimes = NULL, numBrierPoints = 1000, Ltype = "Margin", 
+#                                        Llog = F, typeOneCal = "DN", oneCalBuckets = 10, survivalPredictionMethod = "Median", 
+#                                        AFTDistribution = "weibull", #Model args,
+#                                        FS = T, imputeZero=T # Misc args)
+
+#Inputs: 
+# survivalDataset - This is the dataset one wishes to analyze. This must include 'time', 'delta', and at least 1 more feature. No default.
+# numberOfFolds - The number of desired cross-validation folds. No default.
+# CoxKP, CoxKPEN, KaplanMeier, RSFModel, AFTModel, MTLRModel: Booleans specifying whether or not to run that model. Default is TRUE.
+# DCal, OneCal, Concor, L1Measure, BrierSingle, BrierInt: Booleans specifying whether or not to run that evaluation metric. Default is TRUE.
+# DCalBins: Number of bins for D-Calibration. Default is 10.
+# OneCalTime: An int specifying the time to evaluate 1-Calibration. If left as NULL but OneCal = TRUE, then the 10th, 25th, 50th, 75th,
+#             and 90th percentiless of all event times are used. Default is NULL.
+# concordanceTies: A string ("None", "Time", "Risk","All") indicating how to handle ties in concordance. Default is "Risk".
+# SingleBrierTime: The time to evaluate the Brier Score. If left as null, the 50th percentile of all event times is used. Default is NULL.
+# IntegratedBrierTimes: A 2 length vector (e.g. c(0,100)) specifying the lower and upper bounds on the integrated Brier score. If NULL then
+#                 the default is 0 as a lower bound and the max event time of the entire dataset is used as an upper bound. Default is NULL.
+# numBrierPoints: The number of points to evaluate the integrated Brier score. A simple trapezoidal numerical approximation is used. Default
+#                 is 1000 points.
+# Ltype: The type of L1-loss. Must be one of "Uncensored","Hinge", or "Margin". Default is "Margin".
+# Llog: A boolean specifying whether or not to use log-L1 metric. Default is FALSE.
+# typeOneCal: A string indicating the type of 1-Calibrtion to use. Must be one of "DN" or "Uncensored". Default is "DN".
+# oneCalBuckets: An int specifying number of bins for 1-Calibration. Default is 10.
+# survivalPredictionMethod: The way in which to estimate average surival times. Must be one of "Mean" or "Median". Default is "Mean".
+# AFTDistribution: The distribution to use for AFT, default is "weibull". Must be one of "weibull","exponential","lognormal","gaussian",
+#                   "loglogistic","logistic".
+# FS: A boolean specifying whether or not to use feature selection. Default is TRUE.
+# imputeZero: A boolean specifying whether 0 valued times should be imputed (AFT breaks for 0 valued times). If TRUE then 0 valued times are
+# imputed to half the minimum non-zero time. Default is TRUE. 
 
 #Output: A list of (3) items:
-#(1) datasetUsed: This is the dataset that is actually used post feature selection but pre normalization and imputaiton. datasetUsed
+#(1) datasetUsed: This is the dataset that is actually used post feature selection but pre normalization and imputation. datasetUsed
 #will have all the patients who had acceptable time and delta values and the features that were selected.
 #(2) survivalCurves: This is a list containing the survival curves for all patients for each model that was tested. 
 #(3) results: This is a dataframe containing all the evaluation results with specified model and fold number. Additionally the sample size
@@ -44,10 +53,19 @@
 
 #Note that survivalCurves can be plotted by plotSurvivalCurves().
 
-#Function 2: getSurvivalCurves()
-#This is a helper function for analysisMaster(). It simply retrieves all the survival curves from all test folds and fits all test points
-#from the test folds so all curves are evaluated on the same time points.
-############################################################################################################################################
+## Function 2: getSurvivalCurves()
+
+# coxTimes, coxENTimes, kmTimes, aftTimes, rsfTimes, mtlrTimes - The times used for prediction of each model.
+# CoxKP = T,CoxKPEN=T, KaplanMeier = T, RSFModel = T, AFTModel = T, MTLRModel =T: The models used in analysisMaster.
+# combinedTestResults: A List containing all model survival curves. 
+# numberOfFolds: Number of folds for cross validation.
+# originalIndexing: The original indexing prior to CV folds.
+
+#Output: The survival curves of all survival models for all test patients.
+
+#Usage: This is a helper function for analysisMaster(). This is used to get the survival curves for each model for each patient.
+
+### Code ##################################################################################################################################
 #Data processing files:
 source("ValidateCleanCV/validateAndClean.R")
 source("ValidateCleanCV/createFoldsAndNormalize.R")
@@ -75,8 +93,8 @@ analysisMaster = function(survivalDataset, numberOfFolds,
                           DCal = T, OneCal = T, Concor = T, L1Measure = T, BrierInt = T, BrierSingle = T, #Evaluations
                           DCalBins = 10, OneCalTime = NULL,  concordanceTies = "Risk", #Evaluation args
                           SingleBrierTime = NULL, IntegratedBrierTimes = NULL, numBrierPoints = 1000, Ltype = "Margin", #Evaluation args
-                          Llog = F, typeOneCal = "DN", oneCalBuckets = 10, survivalPredictionMethod = "Mean", #Evaluation args
-                          AFTDistribution = "weibull", ntree = 1000, #Model args,
+                          Llog = F, typeOneCal = "DN", oneCalBuckets = 10, survivalPredictionMethod = "Median", #Evaluation args
+                          AFTDistribution = "weibull", #Model args,
                           FS = T, imputeZero=T # Misc args
                           ){
   validatedData = validateAndClean(survivalDataset, imputeZero)
@@ -125,7 +143,7 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     }
     if(RSFModel){
       print("Starting Random Survival Forests.")
-      rsfMod = RSF(training, testing,ntree = ntree)
+      rsfMod = RSF(training, testing)
       combinedTestResults$RSF[[i]] = rsfMod
       rsfTimes = c(rsfTimes,rsfMod[[1]]$time)
     }

@@ -1,32 +1,43 @@
+#### File Information #####################################################################################################################
 #File Name: Concordance.R
 #Date Created: May 28th, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
 
-#Purpose and General Comments:
+### General Comments ######################################################################################################################
 #This file was created to implement concordance as an evaluation measure for individual survival curves. 
-#Input 1: A list of (1) a matrix of survival curves, (2) the true death times and event/censoring indicator (delta =1 implies death/event) of 
-#the TESTING data, and (3) the true death times and event/censoring indicator (delta =1 implies death/event) of the TRAINING data
-#Input 2: A string indicating the way ties should be handled. Options: "None" will throw out all ties in survival time and all ties from
-#risk scores. "Time" includes ties in survival time but removes ties in risk scores. "Risk" includes ties in risk scores but not in survival
-#time. "All" includes all ties (both in survival time and in risk scores). Note the concordance calculation is given by
-#(Concordant Pairs + (Number of Ties/2))/(Concordant Pairs + Discordant Pairs + Number of Ties)
-#Currently a "risk" score for a survival distribution model is considered to be the mean survival time using a spline fit to make a continuous
-#survival distribution. 
-#Input 3: A string indicating whether the "Mean" or "Median" should be used to calculate a patient's risk score.
-#Output: The C-index.
-##############################################################################################################################################
-#Library Dependencies
+
+### Functions #############################################################################################################################
+
+## Function 1: Concordance(survMod, ties = "None", method = "Median")
+
+#Inputs:
+#   survMod: A list of 4 items:(1) TestCurves - The survival curves for the testing set.
+#                              (2) TestData - The censor/death indicator and event time for the testing set. 
+#                              (3) TrainData - The censor/death indicator and event time for the training set. 
+#                              (4) TrainCurves - The survival curves for the training set.
+#   ties: A string indicating the way ties should be handled. Options: "None" will throw out all ties in survival time and all ties from
+#          risk scores. "Time" includes ties in survival time but removes ties in risk scores. "Risk" includes ties in risk scores but 
+#          not in survival time. "All" includes all ties (both in survival time and in risk scores). Note the concordance calculation is
+#          given by (Concordant Pairs + (Number of Ties/2))/(Concordant Pairs + Discordant Pairs + Number of Ties).
+#   method: A string indicating whether the "Mean" or "Median" should be used to calculate a patient's risk score.
+
+# Output: The C-index.
+
+# Usage: Calculate Concordance given a survival model.
+
+### Code ##################################################################################################################################
+#Library Dependencies:
 #We use this for the survConcordance function.
 library(survival)
 
-#Helper Functions: predictMeanSurvivalTimeLinear(survivalCurve,predictedTimes)
+#Helper Functions: predictMeanSurvivalTimeSpline(survivalCurve,predictedTimes) (Or median)
 source("Evaluations/EvaluationHelperFunctions.R")
 
 #The following function is split into 2 parts. Part 1 retrieves all the relevant pieces from the passed in survMod object, e.g. the survival
 #curves and the true death times of test subjects. Part 2 uses survConcordance to calculate classical concordance measures. Additionally, this
 #is were tied data is handled.
-Concordance = function(survMod, ties = "None", method = "Mean"){
+Concordance = function(survMod, ties = "None", method = "Median"){
   #Part 1:
   #Being passed an empty model.
   if(is.null(survMod)) return(NULL)

@@ -1,21 +1,49 @@
+#### File Information #####################################################################################################################
 #File Name: validateAndClean.R
 #Date Created: May 25, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
 
-#Purpose and General Comments:
+### General Comments ######################################################################################################################
 #The purpose of this file is to take in a survival dataset and validate that it has all parameters required for analysis. Specifically, 
 #we need to validate that the dataset has two columns names time and delta which are our time and event indicator variables respectively.
 #We will also check that these variables do not have things such as nonnegative times, and validate that delta only takes on values of
 #0 and 1, i.e. right censor and event indicators - we do not plan to handle any other type of censoring. From there we will do basic
 #cleaning procedures such as removing heavily missing columns (greater than 25% of observations).
 
-#Input: Survival Dataset
-#Output: Survival Dataset which has been validated and had minor cleaning.
-############################################################################################################################################
+### Functions #############################################################################################################################
+
+## Function 1: validateAndClean(survivalDataset, imputeZero=T)
+
+#Inputs: 
+# survivalDataset: A survival dataset with "time" and "delta" to indicate event times and censoring status. (1 = uncensored/death, 0 = censored).
+# imputeZero: Whether or not to impute zero valued event times to half the minimum positive event time. Note not doing this will break AFT.
+
+# Output: The validated/cleaned dataset.
+
+# Usage: Use this function to verify the data is formatted correctly and do some basic cleaning procedures.
+
+
+## Function 2: validate(survivalDataset, imputeZero)
+
+# Inputs: See validateAndClean().
+
+# Output: The validated dataset
+
+# Usage: This is a helper function for validateAndClean. We use this function to verify the data is formatted correctly.
+
+
+## Function 3: clean(survivalDataset)
+
+# Inputs: See validateAndClean().
+
+# Output: The cleaned dataset (removing variables with no variance/lots of missing data).
+
+# Usage: This is a helper function for validateAndClean. We use this function to remove unacceptable features.
+
+### Code #############################################################################################################################
 #We call caret for the nearZeroVar function. This function will let us remove variables with all the same value.
 library(caret)
-#Functions:
 
 validateAndClean = function(survivalDataset, imputeZero=T){
   validatedData = validate(survivalDataset, imputeZero)

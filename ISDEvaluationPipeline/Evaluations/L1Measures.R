@@ -1,17 +1,31 @@
+#### File Information #####################################################################################################################
 #File Name: L1Measures.R
 #Date Created: May 29th, 2018
 #Author: Humza Haider
 #Email: hshaider@ualberta.ca
 
-#Purpose and General Comments:
+### General Comments ######################################################################################################################
 #This file was created to implement multiple L measures (L1, L1 hinge, L1 margin) as an evaluation metric for individual survival curves.
-# survMod: A list of (1) a matrix of survival curves, and (2) the true death times and event/censoring indicator (delta =1 implies death/event).
-# type: A string specifying the type of L1, options being "Uncensored","Hinge", or "Margin". 
-# logScale: A boolean saying whether or not to use log scale, default is FALSE.
-# method: A string specifying to use the "Mean" or "Median" as the predicted survival time.
-#Output: The desired L1 measure value.
-##############################################################################################################################################
-#Library Dependencies
+
+### Functions #############################################################################################################################
+
+## Function 1: L1(survMod, type = "Margin", logScale = F, method = "Median")
+
+#Inputs:
+#   survMod: A list of 4 items:(1) TestCurves - The survival curves for the testing set.
+#                              (2) TestData - The censor/death indicator and event time for the testing set. 
+#                              (3) TrainData - The censor/death indicator and event time for the training set. 
+#                              (4) TrainCurves - The survival curves for the training set.
+#   type: A string specifying the type of L1, options being "Uncensored","Hinge", or "Margin". 
+#   logScale: A boolean saying whether or not to use log scale, default is FALSE.
+#   method: A string indicating whether the "Mean" or "Median" should be used to calculate a patient's survival time.
+
+# Output: The desired L1-loss.
+
+# Usage: Calculate the L1-loss given a survival model.
+
+### Code #############################################################################################################################
+#Library Dependencies:
 #We need the Surv function from survival for the prodlim implementation of Kaplan Meier
 library(survival)
 #We use this for the prodlim function.
@@ -19,7 +33,7 @@ library(prodlim)
 #Helper Functions: predictMeanSurvivalTimeSpline(survivalCurve,predictedTimes)
 source("Evaluations/EvaluationHelperFunctions.R")
 
-L1 = function(survMod, type = "Margin", logScale = F, method = "Mean"){
+L1 = function(survMod, type = "Margin", logScale = F, method = "Median"){
   #Being passed an empty model.
   if(is.null(survMod)) return(NULL)
   #Being passed a model that failed.
