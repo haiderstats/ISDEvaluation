@@ -14,8 +14,6 @@ FeatureSelection = function(dataset, type ="UniCox", obs_thresh = 0, pThresh = 0
                         UniCox = {
                          oneHotEncoder = dummyVars("~.",data = dataset, fullRank = T)
                          toSelect = as.data.frame(predict(oneHotEncoder, dataset))
-                         toKeepFactor = which(!names(toSelect) %in% names(dataset))
-                         toSelect[,toKeepFactor] = lapply(toSelect[,toKeepFactor, drop = FALSE],function(x)as.factor(x))
                          names(toSelect) = make.names(names(toSelect), unique = T)
                          uniCox(toSelect, obs_thresh, pThresh)
                         }
@@ -58,8 +56,7 @@ uniCox <- function(dataset, obs_thresh=0, pThresh = 0.1){
     if (min_obs_restriction_met==FALSE){
         print(paste(var_name," does not have the required number of observations for each value setting"))
         pValue <- 1
-      }
-      else {
+      }else {
         pValue <- summary(cox.fit)$coefficients[,5]
       }
     if (is.nan(pValue) | is.na(pValue)) {
