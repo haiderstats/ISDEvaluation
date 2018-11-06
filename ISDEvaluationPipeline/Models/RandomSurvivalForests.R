@@ -20,8 +20,11 @@
 #The random forest implimentation is given in randomForestSRC.
 library(randomForestSRC)
 
-RSF = function(training, testing, ntree){
-  rsfMod = rfsrc(Surv(time,delta)~., data = training, ntree = ntree)
+RSF = function(training, testing,ntree = NULL){
+  params = internalCV_RSF(training)
+  ntree = params$ntree
+  nodesize = params$nodesize
+  rsfMod = rfsrc(Surv(time,delta)~., data = training, ntree = ntree, nodesize = nodesize)
   survivalCurves = predict(rsfMod, testing)
   survivalCurvesTrain = predict(rsfMod, training)
   trainingTimes = survivalCurves$time.interest
@@ -39,4 +42,34 @@ RSF = function(training, testing, ntree){
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
   trainingCurvesToReturn = cbind.data.frame(time = times, trainProbabilities)
   return(list(TestCurves = curvesToReturn, TestData = timesAndCensTest,TrainData = timesAndCensTrain,TrainCurves= trainingCurvesToReturn))  
+}
+
+
+
+internalCV_RSF = function(training, numFolds =5){
+  foldedData = createFoldsOfData(training, numFolds)[[2]] 
+  
+  resultsMatrix = matrix(rep(0,numFolds*9), ncol = 9,nrow =numFolds)
+  for(i in 1:numFolds){
+    trainingFold = foldedData[[1]][[i]]
+    testingFold = foldedData[[2]][[i]]
+    
+    resultVec = c()
+    numParam = ncol(trainingFold) -2
+    for(ntree in c(500,1000,2000)){
+        for(nodesize in c(1,2,3)){
+          rsfMod = rfsrc(Surv(time,delta)~., data = training, ntree = ntree,nodesize = nodesize)
+          gc()
+          error = predict(rsfMod, testingFold)$err.rate[ntree]
+          resultVec = c(resultVec,error)
+          }
+        }
+    resultsMatrix[i,] = resultVec
+  }
+  meanResults = apply(resultsMatrix, 2, mean)
+  print(meanResults)
+  bestRes = which.min(meanResults)
+  bestNtree = c(500,1000,2000)[ceiling(bestRes/3)]
+  bestSize = c(1,2,3)[ifelse(bestRes%%3 ==0, 3,bestRes%%3)]
+  return(list(ntree = bestNtree, nodesize = bestSize))
 }
