@@ -81,7 +81,7 @@ L1 = function(survMod, type = "Margin", logScale = F, method = "Mean"){
                                                               lower = time, 
                                                               upper = KMLinearZero,subdivisions = 2000,
                                                               rel.tol = .01)[[1]]/KMLinearPredict(time)))
-                       bestGuess = ifelse(is.nan(bestGuess),0,bestGuess)
+                       bestGuess[censorTimes > KMLinearZero] = censorTimes[censorTimes > KMLinearZero]
                        weights = 1- KMLinearPredict(censorTimes)
                        marginPiece = ifelse(!logScale,
                                             #Use weights!=0 incase there is an infinitiy, we don't get NaN.
