@@ -27,13 +27,20 @@ CoxPH_KP = function(training, testing,ElasticNet=F){
     alpha = NULL
     lambda = NULL
     bestError = Inf
-    for(i in c(0.01,.2,.4,.6,.8,1)){
-      model =  cv.cocktail(as.matrix(training[,-c(timeInd, deltaInd)]),training[,timeInd], training[,deltaInd],alpha = i)
-      modelBestLambdaIndex = which(model$lambda == model$lambda.min)
-      modelError = model$cvm[modelBestLambdaIndex]
+    for(a in c(0.01,.2,.4,.6,.8,1)){
+      errors = NULL
+      #From https://stats.stackexchange.com/questions/97777/variablity-in-cv-glmnet-results
+      for(i in 1:10){
+        model =  cv.cocktail(as.matrix(training[,-c(timeInd, deltaInd)]),training[,timeInd], training[,deltaInd],alpha = a,nfolds = 5)
+        errors = cbind(errors, model$cvm)
+      }
+      rownames(errors) <- model$lambda
+      avgErrors = rowMeans(errors)
+      lambda.min <- as.numeric(names(which.min(avgErrors)))
+      modelError = min(avgErrors)
       if(modelError < bestError){
-        alpha = i
-        lambda = model$lambda.min
+        alpha = a
+        lambda = lambda.min
         bestError = modelError
       }
     }
