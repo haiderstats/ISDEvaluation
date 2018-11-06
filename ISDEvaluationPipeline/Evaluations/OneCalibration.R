@@ -87,7 +87,6 @@ binItUp = function(trueDeathTimes,censorStatus, predictions, type, numBuckets,ti
   numberOfBucketsWithoutExtra = numBuckets - numberOfBucketsWithExtra
   #We want buckets to randomly be assigned their respective number of predictions, but be consistent with the same input.
   #E.g. for 3 buckets with size 5 and 2 buckets of size 4 we don't necasarrily want 5,5,5,4,4. We want them to be random. We use sample().
-  set.seed(42)
   bucketSizes = sample(c(rep(floor(length(predictions)/numBuckets)+1, numberOfBucketsWithExtra),
                          rep(floor(length(predictions)/numBuckets), numberOfBucketsWithoutExtra)))
   bucketLabel = rep(1:numBuckets, times = bucketSizes)
