@@ -9,18 +9,18 @@
 
 ### Functions #############################################################################################################################
 
-## Function 1: analysisMaster = function(survivalDataset, numberOfFolds,
+## Function 1: analysisMaster = function(survivalDataset, numberOfFolds =5,
 #                                        CoxKP = T,CoxKPEN = T, KaplanMeier = T, RSFModel = T, AFTModel = T, MTLRModel =T, #Models
 #                                        DCal = T, OneCal = T, Concor = T, L1Measure = T, BrierInt = T, BrierSingle = T, #Evaluations
 #                                        DCalBins = 10, OneCalTime = NULL,  concordanceTies = "Risk", #Evaluation args
 #                                        SingleBrierTime = NULL, IntegratedBrierTimes = NULL, numBrierPoints = 1000, Ltype = "Margin", 
 #                                        Llog = F, typeOneCal = "DN", oneCalBuckets = 10, survivalPredictionMethod = "Median", 
 #                                        AFTDistribution = "weibull", #Model args,
-#                                        FS = T, imputeZero=T # Misc args)
+#                                        FS = T, imputeZero=T, verbose = T # Misc args)
 
 #Inputs: 
 # survivalDataset - This is the dataset one wishes to analyze. This must include 'time', 'delta', and at least 1 more feature. No default.
-# numberOfFolds - The number of desired cross-validation folds. No default.
+# numberOfFolds - The number of desired cross-validation folds. Default is 5.
 # CoxKP, CoxKPEN, KaplanMeier, RSFModel, AFTModel, MTLRModel: Booleans specifying whether or not to run that model. Default is TRUE.
 # DCal, OneCal, Concor, L1Measure, BrierSingle, BrierInt: Booleans specifying whether or not to run that evaluation metric. Default is TRUE.
 # DCalBins: Number of bins for D-Calibration. Default is 10.
@@ -36,12 +36,14 @@
 # Llog: A boolean specifying whether or not to use log-L1 metric. Default is FALSE.
 # typeOneCal: A string indicating the type of 1-Calibrtion to use. Must be one of "DN" or "Uncensored". Default is "DN".
 # oneCalBuckets: An int specifying number of bins for 1-Calibration. Default is 10.
-# survivalPredictionMethod: The way in which to estimate average surival times. Must be one of "Mean" or "Median". Default is "Mean".
+# survivalPredictionMethod: The way in which to estimate average surival times. Must be one of "Mean" or "Median". Default is "Median".
 # AFTDistribution: The distribution to use for AFT, default is "weibull". Must be one of "weibull","exponential","lognormal","gaussian",
 #                   "loglogistic","logistic".
 # FS: A boolean specifying whether or not to use feature selection. Default is TRUE.
 # imputeZero: A boolean specifying whether 0 valued times should be imputed (AFT breaks for 0 valued times). If TRUE then 0 valued times are
 # imputed to half the minimum non-zero time. Default is TRUE. 
+# verbose: A boolean specifying whether or not to return results and progress information.
+
 
 #Output: A list of (3) items:
 #(1) datasetUsed: This is the dataset that is actually used post feature selection but pre normalization and imputation. datasetUsed
@@ -88,14 +90,14 @@ source("Evaluations/BrierScore.R")
 source("FeatureSelection/FeatureSelection.R")
 source("Plotting/plotSurvivalCurves.R")
 
-analysisMaster = function(survivalDataset, numberOfFolds,
+analysisMaster = function(survivalDataset, numberOfFolds =5,
                           CoxKP = T,CoxKPEN = T, KaplanMeier = T, RSFModel = T, AFTModel = T, MTLRModel =T, #Models
                           DCal = T, OneCal = T, Concor = T, L1Measure = T, BrierInt = T, BrierSingle = T, #Evaluations
                           DCalBins = 10, OneCalTime = NULL,  concordanceTies = "Risk", #Evaluation args
                           SingleBrierTime = NULL, IntegratedBrierTimes = NULL, numBrierPoints = 1000, Ltype = "Margin", #Evaluation args
                           Llog = F, typeOneCal = "DN", oneCalBuckets = 10, survivalPredictionMethod = "Median", #Evaluation args
                           AFTDistribution = "weibull", #Model args,
-                          FS = T, imputeZero=T # Misc args
+                          FS = T, imputeZero=T, verbose = T # Misc args
                           ){
   validatedData = validateAndClean(survivalDataset, imputeZero)
   if(FS)
@@ -107,15 +109,21 @@ analysisMaster = function(survivalDataset, numberOfFolds,
   combinedTestResults = list(Cox = list(),CoxEN = list(), KM = list(), AFT = list(), RSF = list(), MTLR = list())
   coxTimes = NULL;coxENTimes = NULL; kmTimes = NULL; rsfTimes = NULL; aftTimes = NULL; mtlrTimes = NULL;
   for(i in 1:numberOfFolds){
-    print(Sys.time())
-    print(paste("Starting fold",i,"of", numberOfFolds, "total folds."))
+    if(verbose){
+      print(Sys.time())
+      print(paste("Starting fold",i,"of", numberOfFolds, "total folds."))
+    }
     #Models - We evaluate values to NULL so we can pass them to evaluations, regardless if the models were ran or not.
     coxMod = NULL;coxENMod =NULL; kmMod = NULL; rsfMod = NULL; aftMod = NULL; mtlrMod = NULL;
     training = normalizedData[[1]][[i]]
     testing = normalizedData[[2]][[i]]
-    print(paste("Beginning model training."))
+    if(verbose){
+      print(paste("Beginning model training."))
+    }
     if(CoxKP){
+      if(verbose){
       print("Starting Cox Proportional Hazards.")
+      }
       coxMod = CoxPH_KP(training, testing)
       if(length(coxMod) ==1){
         combinedTestResults$Cox = list()
@@ -130,25 +138,33 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       }
     }
     if(CoxKPEN){
+      if(verbose){
       print("Starting Cox Proportional Hazards - Elastic Net.")
+      }
       coxENMod = CoxPH_KP(training, testing,ElasticNet = T)
       combinedTestResults$CoxEN[[i]] = coxENMod
       coxENTimes = c(coxENTimes,coxENMod[[1]]$time)
     }
     if(KaplanMeier){
+      if(verbose){
       print("Starting Kaplan Meier.")
+      }
       kmMod = KM(training, testing)
       combinedTestResults$KM[[i]] = kmMod
       kmTimes = c(kmTimes,kmMod[[1]]$time)
     }
     if(RSFModel){
+      if(verbose){
       print("Starting Random Survival Forests.")
+      }
       rsfMod = RSF(training, testing)
       combinedTestResults$RSF[[i]] = rsfMod
       rsfTimes = c(rsfTimes,rsfMod[[1]]$time)
     }
     if(AFTModel){
+      if(verbose){
       print("Starting Accelerated Failure Time.")
+      }
       aftMod = AFT(training, testing, AFTDistribution)
       if(length(aftMod)==1){
           combinedTestResults$AFT = list()
@@ -163,7 +179,9 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       }
     }
     if(MTLRModel){
+      if(verbose){
       print("Starting Multi-task Logistic Regression (PSSP).")
+      }
       mtlrMod = MTLR(training, testing)
       combinedTestResults$MTLR[[i]] = mtlrMod
       mtlrTimes = c(mtlrTimes,mtlrMod[[1]]$time)
@@ -172,7 +190,9 @@ analysisMaster = function(survivalDataset, numberOfFolds,
     DCalResults = NULL;OneCalResults = NULL;ConcordanceResults = NULL;
     BrierResultsInt = NULL;BrierResultsSingle = NULL;L1Results = NULL; L2Results = NULL; 
     if(Concor){
+      if(verbose){
       print("Staring Evaluation: Concordance")
+      }
       coxConc = Concordance(coxMod, concordanceTies,survivalPredictionMethod)
       coxENConc = Concordance(coxENMod, concordanceTies,survivalPredictionMethod)
       kmConc = Concordance(kmMod, concordanceTies,survivalPredictionMethod)
@@ -183,7 +203,9 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       ConcordanceResults = rbind(coxConc,coxENConc, kmConc, rsfConc, aftConc, mtlrConc)
     }
     if(BrierInt){
+      if(verbose){
       print("Staring Evaluation: Brier Score- Integrated")
+      }
       coxBrierInt = BrierScore(coxMod, type = "Integrated", numPoints = numBrierPoints, integratedBrierTimes = IntegratedBrierTimes)
       coxENBrierInt = BrierScore(coxENMod, type = "Integrated", numPoints = numBrierPoints, integratedBrierTimes = IntegratedBrierTimes)
       kmBrierInt = BrierScore(kmMod, type = "Integrated", numPoints = numBrierPoints, integratedBrierTimes = IntegratedBrierTimes)
@@ -195,7 +217,9 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       
     }
     if(BrierSingle){
+      if(verbose){
       print("Staring Evaluation: Brier Score - Single")
+      }
       coxBrierSingle = BrierScore(coxMod, type = "Single", singleBrierTime =SingleBrierTime )
       coxENBrierSingle = BrierScore(coxENMod, type = "Single", singleBrierTime =SingleBrierTime )
       kmBrierSingle = BrierScore(kmMod, type = "Single", singleBrierTime =SingleBrierTime )
@@ -207,7 +231,9 @@ analysisMaster = function(survivalDataset, numberOfFolds,
       
     }
     if(L1Measure){
+      if(verbose){
       print("Staring Evaluation: L1 Loss")
+      }
       coxL1 = L1(coxMod, Ltype, Llog,survivalPredictionMethod)
       coxENL1 = L1(coxENMod, Ltype, Llog,survivalPredictionMethod)
       kmL1 = L1(kmMod, Ltype, Llog,survivalPredictionMethod)
@@ -221,53 +247,61 @@ analysisMaster = function(survivalDataset, numberOfFolds,
                                 BrierResultsInt, BrierResultsSingle,L1Results))
     metricsRan = c(Concor,BrierInt,BrierSingle, L1Measure)
     names(toAdd) = c("Concordance",
-                     "BrierResultsInt","BrierResultsSingle", "L1Results")[metricsRan]
+                     "BrierInt","BrierSingle", "L1Loss")[metricsRan]
     modelsRan = c(CoxKP,CoxKPEN, KaplanMeier, RSFModel, AFTModel, MTLRModel)
     models = c("CoxKP","CoxKPEN","Kaplan-Meier","RSF","AFT", "MTLR")[modelsRan]
     toAdd = cbind.data.frame(Model = models,FoldNumer = i, toAdd)
     evaluationResults = rbind.data.frame(evaluationResults, toAdd)
+    if(verbose){
     print(evaluationResults)
+    }
   }
   if(DCal){
+    if(verbose){
     print("Staring Evaluation: Cumulative D-Calibration")
-    coxCumDcal = DCalibrationCumulative(combinedTestResults$Cox,DCalBins)
-    coxENCumDcal = DCalibrationCumulative(combinedTestResults$CoxEN,DCalBins)
-    kmCumDcal = DCalibrationCumulative(combinedTestResults$KM,DCalBins)
-    rsfCumDcal = DCalibrationCumulative(combinedTestResults$RSF,DCalBins)
-    aftCumDcal = DCalibrationCumulative(combinedTestResults$AFT,DCalBins)
-    mtlrCumDcal = DCalibrationCumulative(combinedTestResults$MTLR,DCalBins)
+    }
+    coxDcal = DCalibrationCumulative(combinedTestResults$Cox,DCalBins)
+    coxENDcal = DCalibrationCumulative(combinedTestResults$CoxEN,DCalBins)
+    kmDcal = DCalibrationCumulative(combinedTestResults$KM,DCalBins)
+    rsfDcal = DCalibrationCumulative(combinedTestResults$RSF,DCalBins)
+    aftDcal = DCalibrationCumulative(combinedTestResults$AFT,DCalBins)
+    mtlrDcal = DCalibrationCumulative(combinedTestResults$MTLR,DCalBins)
     
-    DCalCumResults = c(coxCumDcal,coxENCumDcal, kmCumDcal, rsfCumDcal, aftCumDcal, mtlrCumDcal)
-    evaluationResults$DCalCumResults = rep(DCalCumResults, numberOfFolds)
+    DCalResults = c(coxDcal,coxENDcal, kmDcal, rsfDcal, aftDcal, mtlrDcal)
+    evaluationResults$DCalibration = rep(DCalResults, numberOfFolds)
   }
   if(OneCal){
+    if(verbose){
     print("Staring Evaluation: Cumulative One-Calibration")
-    coxCum1cal = OneCalibrationCumulative(combinedTestResults$Cox, OneCalTime, typeOneCal, oneCalBuckets)
-    coxENCum1cal = OneCalibrationCumulative(combinedTestResults$CoxEN, OneCalTime, typeOneCal, oneCalBuckets)
-    kmCum1cal = OneCalibrationCumulative(combinedTestResults$KM, OneCalTime, typeOneCal, oneCalBuckets)
-    rsfCum1cal = OneCalibrationCumulative(combinedTestResults$RSF, OneCalTime, typeOneCal, oneCalBuckets)
-    aftCum1cal = OneCalibrationCumulative(combinedTestResults$AFT, OneCalTime, typeOneCal, oneCalBuckets)
-    mtlrCum1cal = OneCalibrationCumulative(combinedTestResults$MTLR, OneCalTime, typeOneCal, oneCalBuckets)
+    }
+    cox1cal = OneCalibrationCumulative(combinedTestResults$Cox, OneCalTime, typeOneCal, oneCalBuckets)
+    coxEN1cal = OneCalibrationCumulative(combinedTestResults$CoxEN, OneCalTime, typeOneCal, oneCalBuckets)
+    km1cal = OneCalibrationCumulative(combinedTestResults$KM, OneCalTime, typeOneCal, oneCalBuckets)
+    rsf1cal = OneCalibrationCumulative(combinedTestResults$RSF, OneCalTime, typeOneCal, oneCalBuckets)
+    aft1cal = OneCalibrationCumulative(combinedTestResults$AFT, OneCalTime, typeOneCal, oneCalBuckets)
+    mtlr1cal = OneCalibrationCumulative(combinedTestResults$MTLR, OneCalTime, typeOneCal, oneCalBuckets)
     
-    numTimes = max(sapply(list(coxCum1cal,coxENCum1cal, kmCum1cal, rsfCum1cal,aftCum1cal, mtlrCum1cal),length))
+    numTimes = max(sapply(list(cox1cal,coxEN1cal, km1cal, rsf1cal,aft1cal, mtlr1cal),length))
     
     for(times in 1:numTimes){
-      varName = paste("OneCalCumResults",times, sep="")
-      assign(varName,c(coxCum1cal[times],coxENCum1cal[times], kmCum1cal[times], rsfCum1cal[times],aftCum1cal[times], mtlrCum1cal[times]))
+      varName = paste("OneCalibration_",times, sep="")
+      assign(varName,c(cox1cal[times],coxEN1cal[times], km1cal[times], rsf1cal[times],aft1cal[times], mtlr1cal[times]))
       evaluationResults[varName] = rep(eval(parse(text=varName)), numberOfFolds)
     }
+    if(verbose){
     print(evaluationResults)
+    }
   }
   #We will add some basic information about the dataset.
   evaluationResults$N = nrow(validatedData)
   #Note we subtract 2 to not count `time` and `delta`.
-  evaluationResults$NumFeatures = ncol(validatedData) - 2
-  evaluationResults$NumFeaturesOneHot = ncol(training) - 2
+  evaluationResults$NumFeatures = ncol(training) - 2
   evaluationResults$PercentCensored = sum(!validatedData$delta)/nrow(validatedData)
   survivalCurves = getSurvivalCurves(coxTimes,coxENTimes, kmTimes, aftTimes, rsfTimes, mtlrTimes,
                                      CoxKP,CoxKPEN, KaplanMeier, RSFModel, AFTModel, MTLRModel,
                                      combinedTestResults, numberOfFolds,originalIndexing)
   names(survivalCurves) = c("Cox","CoxEN","KM","AFT","RSF","MTLR")[c(CoxKP,CoxKPEN, KaplanMeier, AFTModel,RSFModel, MTLRModel)]
+  rownames(evaluationResults) = NULL
   return(list(datasetUsed = validatedData, survivalCurves = survivalCurves, results = evaluationResults))
 }
 
