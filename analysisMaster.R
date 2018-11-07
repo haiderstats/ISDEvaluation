@@ -307,7 +307,8 @@ analysisMaster = function(survivalDataset, numberOfFolds =5,
 
 
 
-
+#This function combines survival curves across the folds into one dataframe (we must get predictions for all
+#the times across all folds otherwise we cannot combine patients from different folds into a dataframe.)
 getSurvivalCurves = function(coxTimes,coxENTimes, kmTimes, aftTimes, rsfTimes, mtlrTimes,
                              CoxKP = T,CoxKPEN=T, KaplanMeier = T, RSFModel = T, AFTModel = T, MTLRModel =T,
                              combinedTestResults, numberOfFolds, originalIndexing){
@@ -337,6 +338,8 @@ getSurvivalCurves = function(coxTimes,coxENTimes, kmTimes, aftTimes, rsfTimes, m
       maxTime = max(times)
       curves  = combinedTestResults[[j]][[i]][[1]][,-1]
       timesToEvaluate = setdiff(allTimes[[j]],times)
+      #Here we are going to combine the times from all folds and fit a spline so all patients have predictions for all times
+      #across all folds.
       fullCurves = cbind.data.frame(fullCurves,sapply(curves,
                                                       function(x){
                                                         curveSpline = splinefun(times,x,method='hyman')
