@@ -63,7 +63,10 @@ plotSurvivalCurves = function(survivalCurves, indexToPlot = 1, color = c(), xlim
           axis.title.x = element_text(margin = margin(t = 15)),
           axis.title.y = element_text(margin = margin(r = 15))) + 
     labs(y = "Survival Probaility",x = "Time" )
-
+  #If we have too many survival curves then the legend takes up the whole plot. We have an if to catch this and remove the legend.
+  if(length(indexToPlot) > 15){
+    plot = plot + theme(legend.position = "None")
+  }
   return(plot)
 }
 
