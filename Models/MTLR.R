@@ -193,7 +193,7 @@ avgLogLikLoss = function(params, dat, timePoints){
   
   #Uncensored patients
   deathTimes = dat$time[(NCens+1):nrow(dat)]
-  uncenSurvival = survivalCurves[,(NCens+1):nrow(dat)]
+  uncenSurvival = survivalCurves[,(NCens+1):nrow(dat),drop=FALSE]
   uncenSurvival = rbind(1,uncenSurvival,0)
   pmfProbs = -diff(uncenSurvival)
   indexRow = sapply(deathTimes, function(x) findInterval(x, timePoints)) + 1
