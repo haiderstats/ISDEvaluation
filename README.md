@@ -2,7 +2,7 @@
 This is a repository of the code used for the paper entitled "Effective Ways to Build and Evaluate Individual
 Survival Distributions". This code can be used to run 6 different survival prediction models (Kaplan-Meier, Cox proportional-hazards, Accelerated Failure Time, Random Survival Forests, Cox Elastic-Net, and Multi-task Logistic Regression) and 5 evaluate those models across 5 different metrics (Concordance, Single/Integrated Brier score, L1-loss, 1-Calibration, and D-Calibration). There is a full tutorial of this code given on  [RPubs](http://rpubs.com/haiderstats/ISDEvaluation), however, we give a miniature example below as well.
 
-Before attempting to run any of the code please make sure you have installed all the required packages: `caret`, `dataPreparation`, `ggplot2`, `reshape2`,`randomForestSRC`, `Rcpp`, `prodlim`, `survival`, `fastcox`, `plyr`,and `dplyr`. Once your working directory is in `ISDEvaluation`, you can run the following
+Before attempting to run any of the code please make sure you have installed all the required packages: `caret`, `dataPreparation`, `ggplot2`, `reshape2`,`randomForestSRC`, `Rcpp`,`RcppArmadillo`, `prodlim`, `survival`, `fastcox`, `plyr`,and `dplyr`. Once your working directory is in `ISDEvaluation`, you can run the following
 
 ```
 source('analysisMaster.R')
