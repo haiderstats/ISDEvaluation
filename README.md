@@ -9,17 +9,23 @@ If you are interested in using the datasets from the paper you can access the NA
 A full tutorial of the code in this repository can be found on Humza Haider's [RPubs site](http://rpubs.com/haiderstats/ISDEvaluation), however, we also give a brief example below. Before attempting to run any of the code please make sure you have installed all the required packages: `caret`, `dataPreparation`, `ggplot2`, `reshape2`,`randomForestSRC`, `Rcpp`,`RcppArmadillo`, `prodlim`, `survival`, `fastcox`, `plyr`,and `dplyr`. Once your working directory is in `ISDEvaluation`, you can run the following
 
 ```
+#First load all the code.
+
 source('analysisMaster.R')
+
 #We will use some example data from the "survival" library. For details on this dataset see 'help(lung)'.
+
 survivalDataset = survival::lung
 
 #If you run 'head(survivalDataset' you will see that the time to event feature is already named 'time'
-but the censor bit is named 'status' and has values of 2 for dead and 1 for censored. We change this
-name to 'delta' and set these values to 0 and 1 below.
+#but the censor bit is named 'status' and has values of 2 for dead and 1 for censored. We change this
+#name to 'delta' and set these values to 0 and 1 below.
+
 names(survivalDataset)[c(3)] = c("delta")
 survivalDataset$delta = survivalDataset$delta - 1
 
 #Then we can run analysisMaster() to get the evaluation results for all the models.
+
 ISD = analysisMaster(survivalDataset, numberOfFolds = 5)
 ```
 
