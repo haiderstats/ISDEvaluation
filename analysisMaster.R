@@ -250,7 +250,11 @@ analysisMaster = function(survivalDataset, numberOfFolds =5,
                      "BrierInt","BrierSingle", "L1Loss")[metricsRan]
     modelsRan = c(CoxKP,CoxKPEN, KaplanMeier, RSFModel, AFTModel, MTLRModel)
     models = c("CoxKP","CoxKPEN","Kaplan-Meier","RSF","AFT", "MTLR")[modelsRan]
-    toAdd = cbind.data.frame(Model = models,FoldNumer = i, toAdd)
+    if(any(metricsRan)){
+      toAdd = cbind.data.frame(Model = models,FoldNumer = i, toAdd)
+    }else{
+      toAdd = cbind.data.frame(Model = models,FoldNumer = i)
+    }
     evaluationResults = rbind.data.frame(evaluationResults, toAdd)
     if(verbose){
     print(evaluationResults)
