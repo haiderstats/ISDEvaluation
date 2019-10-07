@@ -68,7 +68,7 @@
 #prodlim gives a faster KM implementation and also gives a predict function for KM
 library(prodlim)
 #Helper functions:
-source("Evaluations/EvaluationHelperFunctions.R")
+#source("Evaluations/EvaluationHelperFunctions.R")
 
 BrierScore = function(survMod, type = "Integrated", singleBrierTime = NULL, integratedBrierTimes = NULL, numPoints=NULL){
   #Being passed an empty model.
@@ -97,13 +97,13 @@ singleBrier = function(survMod, singleBrierTime){
   #Here we are ordering event times and then using predict with level.chaos = 1 which returns predictions ordered by time.
   orderOfTimes = order(eventTimes)
   #Category one is individuals with event time lower than the time of interest and were NOT censored.
-  weightCat1 = (eventTimes[orderOfTimes] <= singleBrierTime & censorStatus[orderOfTimes])*predict(invProbCensor,
+  weightCat1 = (eventTimes[orderOfTimes] <= singleBrierTime & censorStatus[orderOfTimes])/predict(invProbCensor,
                                                                                             eventTimes,
                                                                                             level.chaos = 1)
   #Catch if event times goes over max training event time, i.e. predict gives NA
   weightCat1[is.na(weightCat1)] = 0
   #Category 2 is individuals whose time was greater than the time of interest (singleBrierTime) - both censored and uncensored individuals.
-  weightCat2 = (eventTimes[orderOfTimes] > singleBrierTime)*predict(invProbCensor,
+  weightCat2 = (eventTimes[orderOfTimes] > singleBrierTime)/predict(invProbCensor,
                                                                     singleBrierTime,
                                                               level.chaos = 1)
   #predict returns NA if the passed in time is greater than any of the times used to build the inverse probability of censoring model.
@@ -131,8 +131,8 @@ integratedBrier = function(survMod, integratedBrierTimes,numPoints){
   }
   bscores = singleBrierMultiplePoints(survMod,points)
   indexs = 2:length(points)
-  trapezoidIntegralVal = diff(points) %*% ((bscores[indexs - 1] + bscores[indexs])/2)
-  intBScore = trapezoidIntegralVal/diff(range(points))
+  trapezoidIntegralVal = apply(bscores, 1, function(bscores) diff(points) %*% ((bscores[indexs - 1] + bscores[indexs])/2))
+  intBScore = mean(trapezoidIntegralVal/diff(range(points)))
   return(intBScore)
 }
 
@@ -148,11 +148,11 @@ singleBrierMultiplePoints = function(survMod, BrierTimes){
   bsPointsMat = matrix(rep(BrierTimes, length(eventTimes)), nrow = length(eventTimes),byrow = T)
   
   #Each column represents the indicator for a single brier score 
-  weightCat1Mat = (eventTimes[orderOfTimes] <= bsPointsMat & censorStatus[orderOfTimes])*predict(invProbCensor, eventTimes, level.chaos = 1)
+  weightCat1Mat = (eventTimes[orderOfTimes] <= bsPointsMat & censorStatus[orderOfTimes])/predict(invProbCensor, eventTimes, level.chaos = 1)
   #Catch if event times goes over max training event time, i.e. predict gives NA
   weightCat1Mat[is.na(weightCat1Mat)] = 0
 
-  weightCat2Mat = t(t((eventTimes[orderOfTimes] > bsPointsMat))*predict(invProbCensor, BrierTimes,level.chaos = 2))
+  weightCat2Mat = t(t((eventTimes[orderOfTimes] > bsPointsMat))/predict(invProbCensor, BrierTimes,level.chaos = 2))
   #Catch if BrierTimes goes over max event time, i.e. predict gives NA
   weightCat2Mat[is.na(weightCat2Mat)] = 0
   
@@ -161,7 +161,37 @@ singleBrierMultiplePoints = function(survMod, BrierTimes){
   #line up with the weight matricies.
   survivalCurvesOrdered = survMod[[1]][,-1][orderOfTimes]
   predictions = t(apply(survivalCurvesOrdered,2, function(curve) predictProbabilityFromCurve(curve,predictedTimes,BrierTimes)))
-  bscores = apply(predictions^2*weightCat1Mat + (1-predictions)^2*weightCat2Mat, 2, mean)
+  bscores = predictions^2*weightCat1Mat + (1-predictions)^2*weightCat2Mat
+  return(bscores)
+}
+
+
+singleBrierMultiplePoints2 = function(survMod, BrierTimes){
+  eventTimes = survMod[[2]]$time
+  censorStatus = survMod[[2]]$delta
+  trainingEventTimes = survMod[[3]]$time
+  trainingCensorStatus = survMod[[3]]$delta
+  inverseCensorTrain = 1 - trainingCensorStatus
+  invProbCensor = prodlim(Surv(trainingEventTimes,inverseCensorTrain)~1)
+  orderOfTimes = order(eventTimes)
+  
+  bsPointsMat = matrix(rep(BrierTimes, length(eventTimes)), nrow = length(eventTimes),byrow = T)
+  
+  #Each column represents the indicator for a single brier score 
+  weightCat1Mat = (eventTimes[orderOfTimes] <= bsPointsMat & censorStatus[orderOfTimes])/predict(invProbCensor, eventTimes, level.chaos = 1)
+  #Catch if event times goes over max training event time, i.e. predict gives NA
+  weightCat1Mat[is.na(weightCat1Mat)] = 0
+  
+  weightCat2Mat = t(t((eventTimes[orderOfTimes] > bsPointsMat))/predict(invProbCensor, BrierTimes,level.chaos = 2))
+  #Catch if BrierTimes goes over max event time, i.e. predict gives NA
+  weightCat2Mat[is.na(weightCat2Mat)] = 0
+  
+  predictedTimes = survMod[[1]][,1]
+  #Take the survival curves, remove the times column, and then order the curves by the order in which they died. We have to order them to
+  #line up with the weight matricies.
+  survivalCurvesOrdered = survMod[[1]][,-1][orderOfTimes]
+  predictions = t(apply(survivalCurvesOrdered,2, function(curve) predictProbabilityFromCurve(curve,predictedTimes,BrierTimes)))
+  bscores = predictions^2*weightCat1Mat + (1-predictions)^2*weightCat2Mat
   return(bscores)
 }
 
