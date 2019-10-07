@@ -59,76 +59,24 @@ library(Rcpp)
 
 #File Dependencies
 #Cpp files for MTLR:
-sourceCpp("Models/AdditionalMTLRFiles/MTLRHelper.cpp")
-#We also need createFoldsOfData() for internalCV_MTLR()
+library(MTLR)
 source("ValidateCleanCV/createFoldsAndNormalize.R")
 #For computing the average log likelihood loss we will need predictProbabilityFromCurve()
 source("Evaluations/EvaluationHelperFunctions.R")
 
 MTLR = function(training, testing, C1 = NULL, numFolds = 5){
   if(is.null(C1)){
-    C1 = internalCV_MTLR(training, numFolds)
+    C1 = mtlr_cv(Surv(time,delta)~.,data=training, loss= "conc", C1_vec = c(10,75,100,150,200,250,350,500,750,1000,1250,1500), train_biases = F,train_uncensored = F)$best_C1
+    print(C1)
   }
   
-  #The Rcpp functions are built to work on data that comes in with patients ordered by their censor status (censored patients first).
-  #Here we order the training and testing sets.
-  ordTrain = order(training$delta)
-  ordTest = order(testing$delta)
-  
-  training = training[ordTrain,]
-  testing = testing[ordTest,]
-  
-  #Set the number of time points to be the square root of the number of training patients (that way the number of time intervals)
-  #is equal to the square root of the number of training patients.
-  m = floor(sqrt(nrow(training))+1)
-  quantileVals = seq(0,1,length.out = m+2)[-c(1,m+2)]
-  timePoints = unname(quantile(training$time, quantileVals))
-  #In the event of small data (or common event times) we will have duplicated time points. Remove them here.
-  timePoints = timePoints[!duplicated(timePoints)]
-  
-  #The Rcpp functions take the data as matricies. Additionally, we pass the censor status and event times as seperate parameters.
-  d = as.matrix(training[,-c(1,2)])
-  dAsZero = matrix(0,ncol = ncol(d), nrow = nrow(d))
-  #We make a matrix where each column is a vector of indicators if the patient is dead at each time point, e.g. (0,0,,...,0,1,1,...1).
-  yval = matrix(1 -Reduce(c,Map(function(x) training$time > timePoints[x],1:length(timePoints))), ncol = nrow(training), byrow = T)
-  
-  #We first train the biases (by setting feature parameters to zero (dAsZero)). Then we train the feature values as if all patients 
-  #were uncensored (this creates "good" starting values since with censored patients the objective is non-convex). Then we finally
-  #train the data with their true censor statuses.
-  #In optim we set the maximum iterations to 5000 and set factr such that the tolerance is roughly 1e-05.
-  biasPar = optim(par = rep(0,length(timePoints)*(ncol(d) +1)),fn = mtlr_objVal,gr = mtlr_grad, yval = yval,
-                  featureVal = dAsZero,C1=C1, delta = sort(training$delta), 
-                  method = "L-BFGS-B", lower = -20,upper=20,control=c(maxit = 5000, factr = .45036e11))
-  
-  allParamsUnc = optim(par = biasPar$par,fn = mtlr_objVal,gr = mtlr_grad, yval = yval, featureVal = d,C1=C1,delta = rep(1,nrow(training)),
-                    method = "L-BFGS-B", lower = -20,upper=20,control=c(maxit = 5000, factr = .45036e11))
-  
-  allParams = optim(par = allParamsUnc$par,fn = mtlr_objVal,gr = mtlr_grad, yval = yval, featureVal = d,C1=C1,delta = sort(training$delta),
-                    method = "L-BFGS-B", lower = -20,upper=20,control=c(maxit = 5000, factr = .45036e11))
-  
-  survivalProbabilitiesTrain =  mtlr_predict(allParams$par, d)
-  survivalProbabilitiesTest =  mtlr_predict(allParams$par, as.matrix(testing[,-c(1,2)]))
-  #Issue due to machine precision, we get survival probabilities of 1+e-16. So here we adjust for that.
-  survivalProbabilitiesTrain[survivalProbabilitiesTrain > 1] = 1
-  survivalProbabilitiesTest[survivalProbabilitiesTest > 1] = 1
-  
-  #Reorder the probabilities to the original way data was passed in.
-  survivalProbabilitiesTrain = survivalProbabilitiesTrain[,order(ordTrain)]
-  survivalProbabilitiesTest = survivalProbabilitiesTest[,order(ordTest)]
-  training = training[order(ordTrain),]
-  testing = testing[order(ordTest),]
-  
-  #If 0 wasnt included in the timepoints we would like to manually add it with a survival probability of 1.
-  if(!(0 %in% timePoints)){
-    timePoints = c(0,timePoints)
-    survivalProbabilitiesTest = rbind(1,survivalProbabilitiesTest)
-    survivalProbabilitiesTrain = rbind(1,survivalProbabilitiesTrain)
-  }
-  
-  testCurvesToReturn = cbind.data.frame(time = timePoints, survivalProbabilitiesTest) 
+  mod = mtlr(Surv(time,delta)~., data = training, C1=C1, train_biases = F, train_uncensored = F)
+  testCurvesToReturn = predict(mod,testing)
+  #testCurvesToReturn = cbind.data.frame(time = timePoints, survivalProbabilitiesTest) 
   timesAndCensTest = cbind.data.frame(time = testing$time, delta = testing$delta)
   timesAndCensTrain = cbind.data.frame(time = training$time, delta = training$delta)
-  trainingCurvesToReturn = cbind.data.frame(time = timePoints, survivalProbabilitiesTrain) 
+  trainingCurvesToReturn = predict(mod)
+  #trainingCurvesToReturn = cbind.data.frame(time = timePoints, survivalProbabilitiesTrain) 
   return(list(TestCurves = testCurvesToReturn, TestData = timesAndCensTest,TrainData = timesAndCensTrain,TrainCurves= trainingCurvesToReturn))  
 }
 
