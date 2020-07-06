@@ -66,7 +66,7 @@ source("Evaluations/EvaluationHelperFunctions.R")
 
 MTLR = function(training, testing, C1 = NULL, numFolds = 5){
   if(is.null(C1)){
-    C1 = mtlr_cv(Surv(time,delta)~.,data=training, loss= "conc", C1_vec = c(10,75,100,150,200,250,350,500,750,1000,1250,1500), train_biases = F,train_uncensored = F)$best_C1
+    C1 = mtlr_cv(Surv(time,delta)~.,data=training, loss= "conc", C1_vec = c(0.001,0.01,0.1,1,10,100,1000), train_biases = T,train_uncensored = T)$best_C1
     print(C1)
   }
   
