@@ -151,8 +151,8 @@ normalizeVariables = function(listOfImputedDatasets){
     
     scales = build_scales(train[-timeDeltaInd], verbose = F)
     zeroVarianceFeatures = which(unlist(scales)[seq(2,length(unlist(scales)),by=2)]== 0)
-    normalizedTrain = fastScale(train[-timeDeltaInd], scales=scales, verbose=F)
-    normalizedTest = fastScale(test[-timeDeltaInd], scales=scales,verbose=F)
+    normalizedTrain = fast_scale(train[-timeDeltaInd], scales=scales, verbose=F)
+    normalizedTest = fast_scale(test[-timeDeltaInd], scales=scales,verbose=F)
     #Note that if there is zero variance in a feature of the training set the models *should* be assigning it a weight of zero, thus
     #the variable shouldn't matter. Regardless, we turn these values back into an "unormalized" version -- note the normalized version is 
     #NaN since the sd would be zero, i.e. we are dividing by 0. Dividing by 0 is bad for your health and safety.
