@@ -102,7 +102,7 @@ L1 = function(survMod, type = "Margin", logScale = F, method = "Median"){
                                             sum(weights*(abs(bestGuess - averageCensored))),
                                             sum(weights*(abs(log(bestGuess) - log(averageCensored))))
                        )
-                       L1Measure = (1/sum(censorStatus))*(uncensoredPiece) + (1/sum(weights))*marginPiece
+                       L1Measure = (uncensoredPiece+marginPiece)/(sum(censorStatus)+sum(weights))
                      }
   )
   return(L1Measure)
